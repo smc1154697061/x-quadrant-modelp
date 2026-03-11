@@ -1,7 +1,8 @@
 import requests
-from typing import List, Dict, Any
-from config.base import OPENAI_BASE_URL, OPENAI_API_KEY, OPENAI_MODEL, OPENAI_TIMEOUT
+import json
+from typing import List, Dict, Any, Generator
 from common import log_
+from config.base import OPENAI_BASE_URL, OPENAI_API_KEY, OPENAI_MODEL, OPENAI_TIMEOUT
 
 
 class OpenAICompatibleModel:
@@ -47,4 +48,40 @@ class OpenAICompatibleModel:
         except Exception as e:
             log_.error(f"OpenAI-Compatible 调用异常: {str(e)}")
             return f"调用模型出错: {str(e)}"
+
+    def stream(self, question: str) -> Generator[str, None, None]:
+        try:
+            url = f"{self.base_url}/v1/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "model": self.model,
+                "messages": self._build_messages(question),
+                "temperature": 0.7,
+                "stream": True
+            }
+            resp = requests.post(url, headers=headers, json=payload, timeout=self.timeout, stream=True)
+            if resp.status_code != 200:
+                log_.error(f"OpenAI-Compatible 流式调用失败: {resp.status_code} {resp.text[:200]}")
+                yield f"调用模型出错: HTTP {resp.status_code}"
+                return
+            for line in resp.iter_lines(decode_unicode=True):
+                if line:
+                    if line.startswith("data: "):
+                        line = line[6:]
+                    if line.strip() == "[DONE]":
+                        break
+                    try:
+                        data = json.loads(line)
+                        delta = data.get("choices", [{}])[0].get("delta", {})
+                        content = delta.get("content", "")
+                        if content:
+                            yield content
+                    except json.JSONDecodeError:
+                        continue
+        except Exception as e:
+            log_.error(f"OpenAI-Compatible 流式调用异常: {str(e)}")
+            yield f"调用模型出错: {str(e)}"
 

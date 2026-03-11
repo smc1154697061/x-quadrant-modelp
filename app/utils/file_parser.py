@@ -3,6 +3,7 @@
 """
 import chardet
 from common import log_
+from common.document_extractor import DocumentExtractor
 
 
 class FileParser:
@@ -64,8 +65,12 @@ class FileParser:
             # TODO: 后续实现Word解析
             raise NotImplementedError("Word文件解析功能暂未实现")
         elif file_type in ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp']:
-            # 图片不需要解析文本内容
-            return "[图片文件]"
+            try:
+                extractor = DocumentExtractor()
+                return extractor.extract_content(file_content, file_type="image")
+            except Exception as e:
+                log_.error(f"图片OCR解析失败: {str(e)}")
+                return "[图片文件]"
         else:
             raise ValueError(f"不支持的文件类型: {file_type}")
     

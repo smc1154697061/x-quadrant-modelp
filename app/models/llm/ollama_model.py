@@ -54,5 +54,12 @@ class OllamaModel:
             return response
         except Exception as e:
             log_.error(f"模型调用失败: {str(e)}")
-            # 抛出ModelCallError异常而不是返回错误字符串
             raise ModelCallError(f"调用模型出错: {str(e)}")
+
+    def stream(self, question: str):
+        try:
+            for chunk in self.llm.stream(question):
+                yield chunk
+        except Exception as e:
+            log_.error(f"流式调用模型失败: {str(e)}")
+            raise ModelCallError(f"流式调用模型出错: {str(e)}")
