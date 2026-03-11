@@ -285,6 +285,143 @@ class ApiService {
   }
 
   /**
+   * 流式POST请求 - 用于SSE/流式数据接收
+   * @param {string} url - 请求地址
+   * @param {Object} data - 请求数据
+   * @param {Function} onChunk - 数据块回调函数
+   * @param {boolean} requireAuth - 是否需要认证
+   */
+  streamPost(url, data = {}, onChunk, requireAuth = true) {
+    const fullUrl = this.getFullUrl(url);
+    const header = {
+      'Content-Type': 'application/json'
+    };
+    
+    if (requireAuth) {
+      const token = safeGetStorage('token');
+      if (token) {
+        header['Authorization'] = `Bearer ${token}`;
+      } else {
+        this.showError('请先登录');
+        return { abort: () => {} };
+      }
+    }
+    
+    let buffer = '';
+    let abortController = null;
+    
+    const parseBuffer = () => {
+      let newlineIndex;
+      while ((newlineIndex = buffer.indexOf('\n\n')) !== -1) {
+        const message = buffer.slice(0, newlineIndex);
+        buffer = buffer.slice(newlineIndex + 2);
+        
+        if (message.startsWith('data: ')) {
+          const dataStr = message.slice(6);
+          if (dataStr === '[DONE]') return;
+          try {
+            const parsed = JSON.parse(dataStr);
+            if (onChunk && typeof onChunk === 'function') {
+              onChunk(parsed);
+            }
+          } catch (e) {
+            console.warn('解析流式数据失败:', dataStr, e);
+          }
+        }
+      }
+    };
+    
+    try {
+      // #ifdef H5
+      if (typeof fetch !== 'undefined') {
+        if (typeof AbortController !== 'undefined') {
+          abortController = new AbortController();
+        }
+        
+        fetch(fullUrl, {
+          method: 'POST',
+          headers: header,
+          body: JSON.stringify(data),
+          signal: abortController ? abortController.signal : undefined
+        }).then(async (response) => {
+          if (response.status === 401) {
+            this.handleUnauthorized();
+            return;
+          }
+          
+          if (!response.ok) {
+            console.error('流式请求失败:', response.status);
+            return;
+          }
+          
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            const chunk = decoder.decode(value, { stream: true });
+            buffer += chunk;
+            parseBuffer();
+          }
+        }).catch((err) => {
+          if (err.name !== 'AbortError') {
+            console.error('流式请求错误:', err);
+          }
+        });
+        
+        return {
+          abort: () => {
+            if (abortController) abortController.abort();
+          }
+        };
+      }
+      // #endif
+      
+      // 小程序平台使用uni.request的onChunkReceived
+      const options = {
+        url: fullUrl,
+        method: 'POST',
+        data: data,
+        header: header,
+        enableChunked: true,
+        responseType: 'arraybuffer'
+      };
+      
+      const requestTask = uni.request(options);
+      
+      if (requestTask.onChunkReceived) {
+        requestTask.onChunkReceived((res) => {
+          const arrayBuffer = res.data;
+          const chunk = String.fromCharCode.apply(null, new Uint8Array(arrayBuffer));
+          buffer += chunk;
+          parseBuffer();
+        });
+      }
+      
+      if (requestTask.onHeadersReceived) {
+        requestTask.onHeadersReceived((res) => {
+          if (res.statusCode === 401) {
+            this.handleUnauthorized();
+          }
+        });
+      }
+      
+      return {
+        abort: () => {
+          if (requestTask && requestTask.abort) {
+            requestTask.abort();
+          }
+        }
+      };
+    } catch (e) {
+      console.error('流式请求初始化失败:', e);
+      return { abort: () => {} };
+    }
+  }
+
+  /**
    * 文件上传
    */
   async upload(url, filePath, formData = {}, requireAuth = true) {

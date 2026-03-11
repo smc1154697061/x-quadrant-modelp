@@ -12,7 +12,7 @@ from common.error_codes import APIException, ErrorCode, ParameterError, Resource
 import os
 import json
 import uuid
-from flask import request, g
+from flask import request, g, Response
 from datetime import datetime
 import traceback
 from common.db_utils import get_db_connection
@@ -640,3 +640,61 @@ class ChatController(BaseResource):
                 "message": f"删除对话失败: {str(e)}",
                 "data": None
             }, 200
+
+    def stream_chat(self, conversation_id=None):
+        """流式聊天接口 - 返回SSE格式数据"""
+        user_id = getattr(g, 'user_id', None)
+        if not user_id:
+            return Response(
+                'data: {"code": "UNAUTHORIZED", "message": "请先登录"}\n\n',
+                mimetype='text/event-stream'
+            )
+        
+        try:
+            params = self.get_params()
+            question = params.get('question', '')
+            
+            if not question:
+                return Response(
+                    'data: {"code": "PARAM_ERROR", "message": "请提供问题内容"}\n\n',
+                    mimetype='text/event-stream'
+                )
+            
+            bot_id = params.get('bot_id')
+            if bot_id:
+                try:
+                    bot = BotService.get_bot(bot_id, user_id)
+                    if bot:
+                        kb_ids = bot.get('kb_ids', [])
+                        self.chat_service.reset_context()
+                        for kb_id in kb_ids:
+                            self.chat_service.load_knowledge_base_by_id(kb_id)
+                        system_prompt = bot.get('system_prompt')
+                        if system_prompt:
+                            self.chat_service.set_system_prompt(system_prompt)
+                except Exception as e:
+                    log_.warning(f"加载机器人配置失败: {str(e)}")
+            
+            def generate():
+                try:
+                    for chunk in self.chat_service.stream_chat_response(question, conversation_id):
+                        yield f'data: {json.dumps({"content": chunk}, ensure_ascii=False)}\n\n'
+                except Exception as e:
+                    log_.error(f"流式输出异常: {str(e)}")
+                    yield f'data: {json.dumps({"error": str(e)}, ensure_ascii=False)}\n\n'
+            
+            return Response(
+                generate(),
+                mimetype='text/event-stream',
+                headers={
+                    'Cache-Control': 'no-cache',
+                    'Connection': 'keep-alive',
+                    'Access-Control-Allow-Origin': '*'
+                }
+            )
+        except Exception as e:
+            log_.error(f"流式聊天初始化失败: {str(e)}")
+            return Response(
+                f'data: {{"code": "SYSTEM_ERROR", "message": {json.dumps(str(e), ensure_ascii=False)}}}\n\n',
+                mimetype='text/event-stream'
+            )

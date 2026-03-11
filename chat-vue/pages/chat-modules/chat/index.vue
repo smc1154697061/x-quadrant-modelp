@@ -911,57 +911,108 @@ export default {
       
       try {
         if (!this.botId) throw new Error('缺少机器人信息');
-        let response;
         
         if (this.conversationId) {
           if (currentFile) {
-            response = await api.upload(
+            const response = await api.upload(
               `/llm/conversations/${this.conversationId}`, 
               currentFile, 
               { question: message || '' }, 
               true
             );
+            this.handleNormalResponse(response);
           } else {
-            response = await api.post(`/llm/conversations/${this.conversationId}`, { question: message }, true);
+            await this.sendStreamMessage(message, this.conversationId);
           }
         } else {
           const createResponse = await api.post('/llm/conversations', { bot_id: this.botId }, true);
           if (createResponse.code === 'SUCCESS') {
             this.conversationId = createResponse.data.id;
             if (currentFile) {
-              response = await api.upload(
+              const response = await api.upload(
                 `/llm/conversations/${this.conversationId}`, 
                 currentFile, 
                 { question: message || '' }, 
                 true
               );
+              this.handleNormalResponse(response);
             } else {
-              response = await api.post(`/llm/conversations/${this.conversationId}`, { question: message }, true);
+              await this.sendStreamMessage(message, this.conversationId);
             }
             if (this.isPc) this.fetchConversations();
           } else {
             throw new Error(createResponse.message || '创建对话失败');
           }
         }
-        
-        if (response && (response.code === 'SUCCESS' || response.code === '0000')) {
-          this.messages.push({
-            role: 'assistant',
-            content: response.data.answer,
-            created_at: new Date().toISOString()
-          });
-          this.$set(this, 'displayMessages', [...this.messages]);
-          if (this.isPc) this.fetchConversations();
-          this.$nextTick(() => { this.scrollToBottom(); });
-        } else {
-          this.handleApiError(response);
-        }
       } catch (error) {
         console.error('发送消息失败:', error);
         this.handleSendMessageError(error);
-      } finally {
-        this.isTyping = false;
       }
+    },
+    
+    // 发送流式消息
+    async sendStreamMessage(message, conversationId) {
+      return new Promise((resolve, reject) => {
+        const botMessage = {
+          role: 'assistant',
+          content: '',
+          created_at: new Date().toISOString(),
+          isStreaming: true
+        };
+        this.messages.push(botMessage);
+        this.$set(this, 'displayMessages', [...this.messages]);
+        this.$nextTick(() => { this.scrollToBottom(); });
+        
+        const messageIndex = this.messages.length - 1;
+        let hasError = false;
+        
+        api.streamPost(
+          `/llm/conversations/${conversationId}/stream`,
+          { question: message, bot_id: this.botId },
+          (chunk) => {
+            if (chunk.content) {
+              this.messages[messageIndex].content += chunk.content;
+              this.$set(this, 'displayMessages', [...this.messages]);
+              this.$nextTick(() => { this.scrollToBottom(); });
+            }
+            if (chunk.error) {
+              hasError = true;
+              this.messages[messageIndex].content = `获取回复失败：${chunk.error}`;
+              this.messages[messageIndex].isError = true;
+              this.messages[messageIndex].isStreaming = false;
+              this.$set(this, 'displayMessages', [...this.messages]);
+              uni.showToast({ title: '获取回复失败', icon: 'none', duration: 2000 });
+            }
+          },
+          true
+        );
+        
+        setTimeout(() => {
+          if (this.messages[messageIndex]) {
+            this.messages[messageIndex].isStreaming = false;
+          }
+          this.isTyping = false;
+          if (this.isPc) this.fetchConversations();
+          resolve();
+        }, 1000);
+      });
+    },
+    
+    // 处理普通API响应
+    handleNormalResponse(response) {
+      if (response && (response.code === 'SUCCESS' || response.code === '0000')) {
+        this.messages.push({
+          role: 'assistant',
+          content: response.data.answer,
+          created_at: new Date().toISOString()
+        });
+        this.$set(this, 'displayMessages', [...this.messages]);
+        if (this.isPc) this.fetchConversations();
+        this.$nextTick(() => { this.scrollToBottom(); });
+      } else {
+        this.handleApiError(response);
+      }
+      this.isTyping = false;
     },
     
     // 处理发送消息错误

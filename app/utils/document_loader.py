@@ -15,16 +15,15 @@ from langchain_community.document_loaders import (
     UnstructuredExcelLoader,
     UnstructuredPowerPointLoader
 )
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema import Document
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 from common import log_
+from common.document_extractor import DocumentExtractor
 
-# 文本分割器配置
 DEFAULT_CHUNK_SIZE = 1000
 DEFAULT_CHUNK_OVERLAP = 200
 
-# 文件扩展名到加载器的映射
 LOADERS = {
     '.txt': TextLoader,
     '.pdf': PyPDFLoader,
@@ -40,6 +39,8 @@ LOADERS = {
     '.pptx': UnstructuredPowerPointLoader
 }
 
+IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'}
+
 def load_document(file_path: str) -> List[Document]:
     """
     根据文件类型加载文档
@@ -50,19 +51,24 @@ def load_document(file_path: str) -> List[Document]:
     Returns:
         List[Document]: 文档对象列表
     """
-    # 获取文件扩展名
     _, ext = os.path.splitext(file_path)
     ext = ext.lower()
     
-    # 检查文件是否存在
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"文件不存在: {file_path}")
     
-    # 检查文件是否为空
     if os.path.getsize(file_path) == 0:
         raise ValueError(f"文件为空: {file_path}")
     
-    # 根据文件类型选择加载器
+    if ext in IMAGE_EXTENSIONS:
+        try:
+            extractor = DocumentExtractor()
+            text = extractor.extract_content(file_path, file_type="image")
+            return [Document(page_content=text, metadata={"source": file_path})]
+        except Exception as e:
+            log_.error(f"图片OCR加载失败: {str(e)}")
+            return [Document(page_content="[图片文件]", metadata={"source": file_path})]
+    
     if ext in LOADERS:
         loader_cls = LOADERS[ext]
         try:
@@ -71,7 +77,6 @@ def load_document(file_path: str) -> List[Document]:
             return docs
         except Exception as e:
             log_.error(f"加载文件 {file_path} 失败: {str(e)}")
-            # 尝试使用文本加载器作为后备方案
             try:
                 loader = TextLoader(file_path, encoding='utf-8')
                 return loader.load()
@@ -79,14 +84,11 @@ def load_document(file_path: str) -> List[Document]:
                 log_.error(f"使用文本加载器加载 {file_path} 失败: {str(e2)}")
                 raise ValueError(f"无法加载文件: {str(e2)}")
     else:
-        # 不支持的文件类型
         raise ValueError(f"不支持的文件类型: {ext}")
 
-def split_document(docs: List[Document], 
-                   chunk_size: int = DEFAULT_CHUNK_SIZE, 
-                   chunk_overlap: int = DEFAULT_CHUNK_OVERLAP) -> List[Document]:
+def split_document(docs: List[Document], chunk_size: int = None, chunk_overlap: int = None) -> List[Document]:
     """
-    将文档分割成块
+    分割文档为小块
     
     Args:
         docs: 文档对象列表
@@ -96,7 +98,11 @@ def split_document(docs: List[Document],
     Returns:
         List[Document]: 分割后的文档块列表
     """
-    # 创建文本分割器
+    if chunk_size is None:
+        chunk_size = DEFAULT_CHUNK_SIZE
+    if chunk_overlap is None:
+        chunk_overlap = DEFAULT_CHUNK_OVERLAP
+    
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
@@ -104,7 +110,6 @@ def split_document(docs: List[Document],
         separators=["\n\n", "\n", " ", ""]
     )
     
-    # 分割文档
     chunks = text_splitter.split_documents(docs)
     
     return chunks
