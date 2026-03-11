@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, viewport-fit=cover" />
+    <title>渡渡鸟知识库</title>
+
+    <!-- 在所有脚本之前添加 uni 模拟对象 -->
+    <script>
+
+    // 创建全局 uni 对象
+    window.uni = {
+      // 请求相关
+      request: function(options) {
+        return fetch(options.url, {
+          method: options.method || 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(options.header || {})
+          },
+          body: options.method !== 'GET' && options.data ? JSON.stringify(options.data) : undefined
+        })
+        .then(response => {
+          return response.json().then(data => {
+            const res = {
+              data: data,
+              statusCode: response.status,
+              header: Object.fromEntries(response.headers.entries())
+            };
+            
+            if (options.success) options.success(res);
+            return res;
+          });
+        })
+        .catch(err => {
+          console.error('uni.request 错误:', err);
+          if (options.fail) options.fail(err);
+          throw err;
+        });
+      },
+      
+      // 存储相关
+      setStorageSync: function(key, data) {
+        try {
+          localStorage.setItem(key, typeof data === 'object' ? JSON.stringify(data) : data);
+        } catch (e) {
+          console.error('存储失败:', e);
+        }
+      },
+      
+      getStorageSync: function(key) {
+        try {
+          const data = localStorage.getItem(key);
+          try {
+            return JSON.parse(data);
+          } catch {
+            return data;
+          }
+        } catch (e) {
+          console.error('读取失败:', e);
+          return '';
+        }
+      },
+      
+      removeStorageSync: function(key) {
+        try {
+          localStorage.removeItem(key);
+        } catch (e) {
+          console.error('删除失败:', e);
+        }
+      },
+      
+      // 导航相关
+      navigateTo: function(options) {
+        setTimeout(() => {
+          window.location.href = options.url;
+          if (options.success) options.success();
+        }, 0);
+      },
+      
+      redirectTo: function(options) {
+        setTimeout(() => {
+          window.location.replace(options.url);
+          if (options.success) options.success();
+        }, 0);
+      },
+      
+      reLaunch: function(options) {
+        setTimeout(() => {
+          window.location.replace(options.url);
+          if (options.success) options.success();
+        }, 0);
+      },
+      
+      // 界面相关
+      showToast: function(options) {
+        alert(options.title || '提示');
+        if (options.success) options.success();
+      },
+      
+      showModal: function(options) {
+        const result = confirm(options.content || options.title || '提示');
+        if (options.success) {
+          options.success({
+            confirm: result,
+            cancel: !result
+          });
+        }
+      },
+      
+      // 获取当前页面
+      getCurrentPages: function() {
+        return [{
+          route: window.location.pathname.substring(1)
+        }];
+      },
+
+      // 添加showLoading和hideLoading方法
+      showLoading: function(options) {
+        if (options?.success) options.success();
+      },
+    };
+    
+    // 模拟 getApp 函数
+    window.getApp = function() {
+      if (!window.__uniapp__) {
+        window.__uniapp__ = {
+          globalData: {}
+        };
+      }
+      return window.__uniapp__;
+    };
+    
+    // 保存原始的 uni 对象
+    const originalUni = window.uni;
+    
+    // 监听 uni 对象的变化
+    Object.defineProperty(window, 'uni', {
+      configurable: true,
+      get: function() {
+        return originalUni;
+      },
+      set: function(newUni) {
+        // 将新的 uni 对象的属性合并到原始对象中，而不是完全替换
+        for (const key in newUni) {
+          if (key !== 'request') { // 保留我们的 request 实现
+            originalUni[key] = newUni[key];
+          }
+        }
+      }
+    });
+
+    </script>
+    
+    <script type="module" src="/main.js"></script>
+  </head>
+  <body>
+    <div id="app"><!--app-html--></div>
+  </body>
+</html>

@@ -1,0 +1,128 @@
+{
+	"pages": [
+		{
+			"path": "pages/user/login/index",
+			"style": {
+				"navigationBarTitleText": "登录/注册",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/knowledge-base/index",
+			"style": {
+				"navigationBarTitleText": "知识库管理",
+				"navigationStyle": "custom",
+				"enablePullDownRefresh": true
+			}
+		},
+		{
+			"path": "pages/knowledge-base/detail",
+			"style": {
+				"navigationBarTitleText": "知识库详情",
+				"navigationStyle": "custom",
+				"enablePullDownRefresh": true
+			}
+		},
+		{
+			"path": "pages/chat-modules/chat-list/index",
+			"style": {
+				"navigationBarTitleText": "对话管理",
+				"navigationStyle": "custom",
+				"enablePullDownRefresh": true
+			}
+		},
+		{
+			"path": "pages/chat-modules/chat/index",
+			"style": {
+				"navigationBarTitleText": "智能对话",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/bot-modules/bot-list/index",
+			"style": {
+				"navigationBarTitleText": "智能对话",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/tools/index",
+			"style": {
+				"navigationBarTitleText": "实用工具",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/tools/extraction/index",
+			"style": {
+				"navigationBarTitleText": "内容提取",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/settings/index",
+			"style": {
+				"navigationBarTitleText": "系统设置",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/user/profile",
+			"style": {
+				"navigationBarTitleText": "个人中心",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/bot-modules/bot-detail/index",
+			"style": {
+				"navigationBarTitleText": "机器人详情",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/bot-modules/edit-bot/index",
+			"style": {
+				"navigationBarTitleText": "编辑机器人",
+				"navigationStyle": "custom"
+			}
+		}
+	],
+	"globalStyle": {
+		"navigationBarTextStyle": "black",
+		"navigationBarTitleText": "AI助手",
+		"navigationBarBackgroundColor": "#F8F8F8",
+		"backgroundColor": "#F8F8F8"
+	},
+	"tabBar": {
+		"color": "#999999",
+		"selectedColor": "#007bff",
+		"backgroundColor": "#FFFFFF",
+		"borderStyle": "black",
+		"list": [
+			{
+				"pagePath": "pages/knowledge-base/index",
+				"text": "知识库"
+			},
+			{
+				"pagePath": "pages/bot-modules/bot-list/index",
+				"text": "对话"
+			},
+			{
+				"pagePath": "pages/tools/index",
+				"text": "工具"
+			},
+			{
+				"pagePath": "pages/settings/index",
+				"text": "设置"
+			}
+		]
+	},
+	"easycom": {
+		"autoscan": true,
+		"custom": {
+			"^uni-(.*)": "@dcloudio/uni-ui/lib/uni-$1/uni-$1.vue"
+		}
+	},
+	"uniIdRouter": {}
+}

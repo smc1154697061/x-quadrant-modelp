@@ -1,0 +1,26 @@
+logs/*.log
+.venv
+.idea/
+
+# Python缓存文件
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 开发环境
+.env
+.venv
+env/
+venv/
+ENV/
+
+# 数据文件和临时文件
+data/vector_store/
+*.log
+.DS_Store
+
+# uni-app 构建和缓存目录
+chat-vue/unpackage/
