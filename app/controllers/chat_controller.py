@@ -12,7 +12,7 @@ from common.error_codes import APIException, ErrorCode, ParameterError, Resource
 import os
 import json
 import uuid
-from flask import request, g
+from flask import request, g, Response, stream_with_context
 from datetime import datetime
 import traceback
 from common.db_utils import get_db_connection
@@ -46,6 +46,9 @@ class ChatController(BaseResource):
         elif 'chat' in request.path and conversation_id is None:
             # 处理不保存的对话
             return self.handle_unsaved_chat()
+        elif '/stream/' in request.path:
+            # 流式发送消息请求
+            return self.send_message_stream(conversation_id)
         elif conversation_id is None:
             # 创建对话请求
             return self.create_conversation()
@@ -304,6 +307,160 @@ class ChatController(BaseResource):
                 "message": f"发送消息失败: {str(e)}",
                 "data": None
             }, 200
+
+    def send_message_stream(self, conversation_id=None):
+        """处理发送消息请求（流式响应）"""
+        params = self.get_params()
+        question = params.get('question', '')
+        
+        files = request.files.getlist('files')
+        if not files:
+            files = request.files.getlist('file')
+        
+        if not question and not files:
+            def error_gen():
+                yield f"data: {json.dumps({'code': 'PARAM_ERROR', 'message': '请提供问题内容或上传文件', 'data': None}, ensure_ascii=False)}\n\n"
+            return Response(stream_with_context(error_gen()), mimetype='text/event-stream')
+        
+        try:
+            user_id = g.user_id
+            conversation = ConversationService.get_conversation(conversation_id, user_id)
+            if not conversation:
+                def error_gen():
+                    yield f"data: {json.dumps({'code': 'RESOURCE_NOT_FOUND', 'message': '对话不存在', 'data': None}, ensure_ascii=False)}\n\n"
+                return Response(stream_with_context(error_gen()), mimetype='text/event-stream')
+            
+            if conversation['user_id'] != user_id:
+                def error_gen():
+                    yield f"data: {json.dumps({'code': 'PERMISSION_DENIED', 'message': '无权访问此对话', 'data': None}, ensure_ascii=False)}\n\n"
+                return Response(stream_with_context(error_gen()), mimetype='text/event-stream')
+            
+            bot_id = conversation.get('bot_id')
+            bot = None
+            if bot_id:
+                bot = BotService.get_bot(bot_id, user_id)
+                if bot:
+                    kb_ids = bot.get('kb_ids', [])
+            
+            self.chat_service.reset_context()
+            
+            for kb_id in kb_ids:
+                self.chat_service.load_knowledge_base_by_id(kb_id)
+            
+            role_key = params.get('role_key')
+            if role_key:
+                self.chat_service.set_role(role_key)
+            
+            system_prompt = bot.get('system_prompt')
+            if system_prompt:
+                self.chat_service.set_system_prompt(system_prompt)
+            
+            uploaded_files = []
+            file_contents = []
+            
+            if files:
+                original_filename = request.form.get('original_filename')
+                
+                for file in files:
+                    try:
+                        file_info = self.chat_service.upload_message_file(
+                            file=file,
+                            user_id=user_id,
+                            bot_name=bot.get('name') if bot else None,
+                            original_filename=original_filename
+                        )
+                        uploaded_files.append(file_info)
+                        
+                        if file_info.get('file_content_text'):
+                            file_contents.append({
+                                'filename': file_info['filename'],
+                                'content': file_info['file_content_text']
+                            })
+                    except Exception as e:
+                        log_.error(f"上传文件失败: {str(e)}")
+                        def error_gen():
+                            yield f"data: {json.dumps({'code': 'FILE_UPLOAD_ERROR', 'message': f'文件上传失败: {str(e)}', 'data': None}, ensure_ascii=False)}\n\n"
+                        return Response(stream_with_context(error_gen()), mimetype='text/event-stream')
+            
+            try:
+                if uploaded_files and question:
+                    file_message = MessageService.save_message(
+                        conversation_id=conversation_id,
+                        role='user',
+                        content='[已上传文件]'
+                    )
+                    file_message_id = file_message.get('id')
+                    if file_message_id:
+                        for file_info in uploaded_files:
+                            self.chat_service.message_document_dao.create_message_document(
+                                message_id=file_message_id,
+                                document_id=file_info['document_id']
+                            )
+
+                    user_message = MessageService.save_message(
+                        conversation_id=conversation_id,
+                        role='user',
+                        content=question
+                    )
+                else:
+                    display_content = question if question else "[已上传文件]"
+                    user_message = MessageService.save_message(
+                        conversation_id=conversation_id,
+                        role='user',
+                        content=display_content
+                    )
+                    user_message_id = user_message.get('id')
+                    if user_message_id and uploaded_files:
+                        for file_info in uploaded_files:
+                            self.chat_service.message_document_dao.create_message_document(
+                                message_id=user_message_id,
+                                document_id=file_info['document_id']
+                            )
+            except Exception as e:
+                log_.error(f"保存用户消息异常: {str(e)}")
+            
+            full_response = []
+            
+            def generate():
+                try:
+                    if file_contents:
+                        stream_gen = self.chat_service.get_chat_response_with_files_stream(
+                            question=question,
+                            file_contents=file_contents,
+                            conversation_id=conversation_id
+                        )
+                    else:
+                        stream_gen = self.chat_service.get_chat_response_stream(question, conversation_id)
+                    
+                    for chunk in stream_gen:
+                        if chunk:
+                            full_response.append(chunk)
+                            yield f"data: {json.dumps({'code': 'STREAM', 'data': {'content': chunk}}, ensure_ascii=False)}\n\n"
+                    
+                    complete_response = ''.join(full_response)
+                    try:
+                        ai_message = MessageService.save_message(
+                            conversation_id=conversation_id,
+                            role='assistant',
+                            content=complete_response
+                        )
+                        log_.debug(f"AI回复已成功保存到数据库，ID: {ai_message.get('id')}")
+                    except Exception as e:
+                        log_.error(f"保存AI回复失败: {str(e)}")
+                    
+                    yield f"data: {json.dumps({'code': 'DONE', 'data': {'conversation_id': conversation_id}}, ensure_ascii=False)}\n\n"
+                    
+                except Exception as e:
+                    log_.error(f"流式响应生成失败: {str(e)}")
+                    yield f"data: {json.dumps({'code': 'SYSTEM_ERROR', 'message': f'生成回复失败: {str(e)}', 'data': None}, ensure_ascii=False)}\n\n"
+            
+            return Response(stream_with_context(generate()), mimetype='text/event-stream')
+            
+        except Exception as e:
+            log_.error(f"发送消息失败: {str(e)}")
+            def error_gen():
+                yield f"data: {json.dumps({'code': 'SYSTEM_ERROR', 'message': f'发送消息失败: {str(e)}', 'data': None}, ensure_ascii=False)}\n\n"
+            return Response(stream_with_context(error_gen()), mimetype='text/event-stream')
             
     def create_conversation(self):
         """创建新对话"""

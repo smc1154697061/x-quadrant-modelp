@@ -350,6 +350,155 @@ class ChatService:
             log_.error(f"直接回答处理失败: {str(e)}")
             log_.error(traceback.format_exc())
             return f"抱歉，我无法理解您的问题。错误信息: {str(e)}"
+    
+    def get_chat_response_stream(self, question, conversation_id=None):
+        """
+        获取流式聊天回答，使用RAG流程
+        
+        Args:
+            question: 用户问题
+            conversation_id: 会话ID
+            
+        Yields:
+            str: 每次生成的文本片段
+        """
+        try:
+            self.current_conversation_id = conversation_id
+            
+            role_prompt = PromptService.get_role_prompt(
+                role_key=self.current_role_key,
+                custom_prompt=self.custom_system_prompt
+            )
+            
+            history_context = ""
+            if self.current_conversation_id:
+                try:
+                    history_messages = self.message_dao.get_recent_messages(
+                        conversation_id=self.current_conversation_id,
+                        limit=self.max_history_messages
+                    )
+                    
+                    if history_messages:
+                        history_context = PromptService.build_history_context(
+                            history_messages,
+                            max_pairs=5
+                        )
+                except Exception as e:
+                    log_.error(f"获取历史消息失败: {str(e)}")
+            
+            if not self.current_kb_ids:
+                log_.warning("没有选择知识库，使用直接回答模式(流式)")
+                for chunk in self.get_direct_response_stream(question, role_prompt, history_context):
+                    yield chunk
+                return
+            
+            all_results = []
+            for kb_id in self.current_kb_ids:
+                try:
+                    results = self.vector_store.similarity_search_by_kb_id(
+                        query=question,
+                        kb_id=kb_id,
+                        k=self.search_k
+                    )
+                    
+                    if results and len(results) > 0:
+                        all_results.extend(results)
+                except Exception as e:
+                    log_.warning(f"从知识库 {kb_id} 检索失败: {str(e)}")
+            
+            if not all_results:
+                log_.warning("向量检索未找到相关文档，切换到直接回答模式(流式)")
+                for chunk in self.get_direct_response_stream(question, role_prompt, history_context):
+                    yield chunk
+                return
+            
+            all_results.sort(key=lambda x: x.get("score", 0), reverse=True)
+            top_results = all_results[:self.search_k]
+            
+            knowledge_context = PromptService.build_knowledge_context(top_results)
+            
+            prompt = PromptService.build_rag_prompt(
+                role_prompt=role_prompt,
+                history_context=history_context,
+                knowledge_context=knowledge_context,
+                file_context="",
+                question=question
+            )
+            
+            log_.debug(f"=== 发送给AI的完整Prompt(流式RAG模式) ===\n{prompt}\n=== Prompt结束 ===")
+            
+            for chunk in self.llm_model.stream(prompt):
+                yield chunk
+                
+        except Exception as e:
+            log_.error(f"知识库聊天处理失败(流式): {str(e)}")
+            log_.error(traceback.format_exc())
+            yield f"抱歉，处理您的问题时出现错误: {str(e)}"
+    
+    def get_direct_response_stream(self, question, role_prompt, history_context=""):
+        """直接调用模型获取流式回答
+        
+        Args:
+            question: 用户问题
+            role_prompt: 角色提示词
+            history_context: 历史对话上下文
+            
+        Yields:
+            str: 每次生成的文本片段
+        """
+        try:
+            prompt = PromptService.build_direct_prompt(
+                role_prompt=role_prompt,
+                history_context=history_context,
+                file_context="",
+                question=question
+            )
+            
+            log_.debug(f"=== 发送给AI的完整Prompt(流式直接回答模式) ===\n{prompt}\n=== Prompt结束 ===")
+            
+            for chunk in self.llm_model.stream(prompt):
+                yield chunk
+        except Exception as e:
+            log_.error(f"直接回答处理失败(流式): {str(e)}")
+            log_.error(traceback.format_exc())
+            yield f"抱歉，我无法理解您的问题。错误信息: {str(e)}"
+    
+    def get_chat_response_with_files_stream(self, question, file_contents, conversation_id=None):
+        """
+        处理带文件的聊天请求(流式版本)
+        
+        Args:
+            question: 用户问题
+            file_contents: 文件内容列表 [{'filename': 'xxx', 'content': 'xxx'}, ...]
+            conversation_id: 会话ID
+            
+        Yields:
+            str: 每次生成的文本片段
+        """
+        try:
+            full_question = question
+            
+            if file_contents:
+                file_texts = []
+                for file_info in file_contents:
+                    filename = file_info.get('filename', '未知文件')
+                    content = file_info.get('content', '')
+                    
+                    if content and len(content.strip()) > 0:
+                        file_texts.append(f"【文件：{filename}】\n{content}")
+                    else:
+                        log_.warning(f"文件内容为空: {filename}")
+                
+                if file_texts:
+                    full_question = f"{question}\n\n附件内容:\n" + "\n\n".join(file_texts)
+            
+            for chunk in self.get_chat_response_stream(full_question, conversation_id):
+                yield chunk
+                
+        except Exception as e:
+            log_.error(f"处理带文件的聊天请求失败(流式): {str(e)}")
+            log_.error(traceback.format_exc())
+            yield f"处理失败: {str(e)}"
             
     def get_conversation_history(self, conversation_id, limit=50):
         """获取对话历史记录"""

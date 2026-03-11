@@ -36,6 +36,9 @@ api.add_resource(ChatController, '/llm/bots/<int:bot_id>', endpoint='bot_detail'
 api.add_resource(ChatController, '/llm/conversations', endpoint='conversations')
 api.add_resource(ChatController, '/llm/conversations/<int:conversation_id>', endpoint='conversation')
 
+# 流式聊天API - 必须放在普通conversation路由之前，使用不同的URL结构
+api.add_resource(ChatController, '/llm/stream/conversations/<int:conversation_id>', endpoint='conversation_stream')
+
 # 提取API - 修改为使用 /llm 前缀
 api.add_resource(ExtractionController, '/llm/extract')
 

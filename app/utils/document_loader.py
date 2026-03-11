@@ -20,11 +20,39 @@ from langchain.schema import Document
 
 from common import log_
 
-# 文本分割器配置
 DEFAULT_CHUNK_SIZE = 1000
 DEFAULT_CHUNK_OVERLAP = 200
 
-# 文件扩展名到加载器的映射
+IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.gif', '.webp'}
+
+
+class ImageLoader:
+    """图片文件加载器 - 使用OCR提取文本"""
+    
+    def __init__(self, file_path: str):
+        self.file_path = file_path
+    
+    def load(self) -> List[Document]:
+        from common.document_extractor import extract_content
+        
+        try:
+            text = extract_content(self.file_path, 'image')
+            
+            if not text or not text.strip():
+                log_.warning(f"图片OCR未提取到文本: {self.file_path}")
+                text = "[图片内容无法识别]"
+            
+            metadata = {
+                "source": self.file_path,
+                "file_type": "image"
+            }
+            
+            return [Document(page_content=text, metadata=metadata)]
+        except Exception as e:
+            log_.error(f"图片OCR处理失败: {str(e)}")
+            return [Document(page_content=f"[图片处理失败: {str(e)}]", metadata={"source": self.file_path, "file_type": "image", "error": True})]
+
+
 LOADERS = {
     '.txt': TextLoader,
     '.pdf': PyPDFLoader,
@@ -37,8 +65,17 @@ LOADERS = {
     '.xls': UnstructuredExcelLoader,
     '.xlsx': UnstructuredExcelLoader,
     '.ppt': UnstructuredPowerPointLoader,
-    '.pptx': UnstructuredPowerPointLoader
+    '.pptx': UnstructuredPowerPointLoader,
+    '.jpg': ImageLoader,
+    '.jpeg': ImageLoader,
+    '.png': ImageLoader,
+    '.bmp': ImageLoader,
+    '.tiff': ImageLoader,
+    '.tif': ImageLoader,
+    '.gif': ImageLoader,
+    '.webp': ImageLoader
 }
+
 
 def load_document(file_path: str) -> List[Document]:
     """
@@ -50,19 +87,15 @@ def load_document(file_path: str) -> List[Document]:
     Returns:
         List[Document]: 文档对象列表
     """
-    # 获取文件扩展名
     _, ext = os.path.splitext(file_path)
     ext = ext.lower()
     
-    # 检查文件是否存在
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"文件不存在: {file_path}")
     
-    # 检查文件是否为空
     if os.path.getsize(file_path) == 0:
         raise ValueError(f"文件为空: {file_path}")
     
-    # 根据文件类型选择加载器
     if ext in LOADERS:
         loader_cls = LOADERS[ext]
         try:
@@ -71,7 +104,6 @@ def load_document(file_path: str) -> List[Document]:
             return docs
         except Exception as e:
             log_.error(f"加载文件 {file_path} 失败: {str(e)}")
-            # 尝试使用文本加载器作为后备方案
             try:
                 loader = TextLoader(file_path, encoding='utf-8')
                 return loader.load()
@@ -79,8 +111,8 @@ def load_document(file_path: str) -> List[Document]:
                 log_.error(f"使用文本加载器加载 {file_path} 失败: {str(e2)}")
                 raise ValueError(f"无法加载文件: {str(e2)}")
     else:
-        # 不支持的文件类型
         raise ValueError(f"不支持的文件类型: {ext}")
+
 
 def split_document(docs: List[Document], 
                    chunk_size: int = DEFAULT_CHUNK_SIZE, 
@@ -96,7 +128,6 @@ def split_document(docs: List[Document],
     Returns:
         List[Document]: 分割后的文档块列表
     """
-    # 创建文本分割器
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
@@ -104,7 +135,6 @@ def split_document(docs: List[Document],
         separators=["\n\n", "\n", " ", ""]
     )
     
-    # 分割文档
     chunks = text_splitter.split_documents(docs)
     
     return chunks

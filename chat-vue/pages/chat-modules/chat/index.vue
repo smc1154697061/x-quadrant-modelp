@@ -909,70 +909,118 @@ export default {
       this.$nextTick(() => { this.scrollToBottom(); });
       this.isTyping = true;
       
+      // 添加一个空的AI消息占位符，用于流式显示
+      const aiMessageIndex = this.messages.length;
+      this.messages.push({
+        role: 'assistant',
+        content: '',
+        created_at: new Date().toISOString(),
+        isStreaming: true
+      });
+      this.$set(this, 'displayMessages', [...this.messages]);
+      
       try {
         if (!this.botId) throw new Error('缺少机器人信息');
-        let response;
         
-        if (this.conversationId) {
-          if (currentFile) {
-            response = await api.upload(
-              `/llm/conversations/${this.conversationId}`, 
-              currentFile, 
-              { question: message || '' }, 
-              true
-            );
-          } else {
-            response = await api.post(`/llm/conversations/${this.conversationId}`, { question: message }, true);
-          }
-        } else {
+        // 确保有conversationId
+        if (!this.conversationId) {
           const createResponse = await api.post('/llm/conversations', { bot_id: this.botId }, true);
           if (createResponse.code === 'SUCCESS') {
             this.conversationId = createResponse.data.id;
-            if (currentFile) {
-              response = await api.upload(
-                `/llm/conversations/${this.conversationId}`, 
-                currentFile, 
-                { question: message || '' }, 
-                true
-              );
-            } else {
-              response = await api.post(`/llm/conversations/${this.conversationId}`, { question: message }, true);
-            }
             if (this.isPc) this.fetchConversations();
           } else {
             throw new Error(createResponse.message || '创建对话失败');
           }
         }
         
-        if (response && (response.code === 'SUCCESS' || response.code === '0000')) {
-          this.messages.push({
-            role: 'assistant',
-            content: response.data.answer,
-            created_at: new Date().toISOString()
-          });
-          this.$set(this, 'displayMessages', [...this.messages]);
-          if (this.isPc) this.fetchConversations();
-          this.$nextTick(() => { this.scrollToBottom(); });
-        } else {
-          this.handleApiError(response);
-        }
+        // 使用流式请求
+        await this.sendMessageStream(message, currentFile, aiMessageIndex);
+        
       } catch (error) {
         console.error('发送消息失败:', error);
-        this.handleSendMessageError(error);
+        this.handleSendMessageError(error, aiMessageIndex);
       } finally {
         this.isTyping = false;
       }
     },
     
-    // 处理发送消息错误
-    handleSendMessageError(error) {
-      uni.showToast({ title: error.message || '发送消息失败', icon: 'none', duration: 2000 });
-      this.messages.push({
-        role: 'assistant',
-        content: `发送消息失败：${error.message || '未知错误'}`,
-        created_at: new Date().toISOString(),
-        isError: true
+    // 流式发送消息
+    async sendMessageStream(message, currentFile, aiMessageIndex) {
+      return new Promise((resolve, reject) => {
+        const streamUrl = `/llm/conversations/${this.conversationId}/stream`;
+        let fullContent = '';
+        
+        if (currentFile) {
+          // 文件上传使用传统方式，因为流式上传较复杂
+          api.upload(
+            streamUrl, 
+            currentFile, 
+            { question: message || '' }, 
+            true
+          ).then(response => {
+            if (response && (response.code === 'SUCCESS' || response.code === '0000')) {
+              this.messages[aiMessageIndex].content = response.data.answer;
+              this.messages[aiMessageIndex].isStreaming = false;
+              this.$set(this, 'displayMessages', [...this.messages]);
+              if (this.isPc) this.fetchConversations();
+              this.$nextTick(() => { this.scrollToBottom(); });
+              resolve();
+            } else {
+              reject(new Error(response?.message || '请求失败'));
+            }
+          }).catch(error => {
+            reject(error);
+          });
+        } else {
+          // 纯文本消息使用流式请求
+          api.stream(
+            streamUrl,
+            { question: message },
+            // onMessage - 每次收到新的内容片段
+            (content) => {
+              fullContent += content;
+              this.messages[aiMessageIndex].content = fullContent;
+              this.$set(this, 'displayMessages', [...this.messages]);
+              this.$nextTick(() => { this.scrollToBottom(); });
+            },
+            // onDone - 流式完成
+            (data) => {
+              this.messages[aiMessageIndex].isStreaming = false;
+              this.$set(this, 'displayMessages', [...this.messages]);
+              if (this.isPc) this.fetchConversations();
+              resolve();
+            },
+            // onError - 错误处理
+            (error) => {
+              console.error('流式请求错误:', error);
+              this.messages[aiMessageIndex].content = `获取回复失败：${error.message || '未知错误'}`;
+              this.messages[aiMessageIndex].isStreaming = false;
+              this.messages[aiMessageIndex].isError = true;
+              this.$set(this, 'displayMessages', [...this.messages]);
+              reject(error);
+            },
+            true
+          );
+        }
       });
+    },
+    
+    // 处理发送消息错误
+    handleSendMessageError(error, aiMessageIndex) {
+      uni.showToast({ title: error.message || '发送消息失败', icon: 'none', duration: 2000 });
+      
+      if (aiMessageIndex !== undefined && this.messages[aiMessageIndex]) {
+        this.messages[aiMessageIndex].content = `发送消息失败：${error.message || '未知错误'}`;
+        this.messages[aiMessageIndex].isStreaming = false;
+        this.messages[aiMessageIndex].isError = true;
+      } else {
+        this.messages.push({
+          role: 'assistant',
+          content: `发送消息失败：${error.message || '未知错误'}`,
+          created_at: new Date().toISOString(),
+          isError: true
+        });
+      }
       this.$set(this, 'displayMessages', [...this.messages]);
       this.$nextTick(() => { this.scrollToBottom(); });
       this.isTyping = false;

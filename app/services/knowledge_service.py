@@ -32,10 +32,11 @@ class KnowledgeService:
         self._embeddings_model = None
         self._vector_store = None
         
-        # 允许上传的文件类型
+        # 允许上传的文件类型（包含图片类型）
         self.allowed_extensions = {
             'txt', 'pdf', 'doc', 'docx', 'csv', 'xls', 'xlsx', 
-            'ppt', 'pptx', 'md', 'html', 'htm'
+            'ppt', 'pptx', 'md', 'html', 'htm',
+            'jpg', 'jpeg', 'png', 'bmp', 'tiff', 'tif', 'gif', 'webp'
         }
         
         self._presigned_url_cache = {}  # 添加预签名URL缓存

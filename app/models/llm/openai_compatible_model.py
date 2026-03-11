@@ -1,5 +1,6 @@
 import requests
-from typing import List, Dict, Any
+import json
+from typing import List, Dict, Any, Generator
 from config.base import OPENAI_BASE_URL, OPENAI_API_KEY, OPENAI_MODEL, OPENAI_TIMEOUT
 from common import log_
 
@@ -18,7 +19,6 @@ class OpenAICompatibleModel:
             raise ValueError("OpenAI-Compatible 配置不完整，请在 config/base.py 设置 OPENAI_BASE_URL/OPENAI_API_KEY/OPENAI_MODEL")
 
     def _build_messages(self, prompt: str) -> List[Dict[str, Any]]:
-        # 将长 prompt 作为 user 消息；若包含系统提示词可按约定自行拆分
         return [{"role": "user", "content": prompt}]
 
     def invoke(self, question: str) -> str:
@@ -48,3 +48,52 @@ class OpenAICompatibleModel:
             log_.error(f"OpenAI-Compatible 调用异常: {str(e)}")
             return f"调用模型出错: {str(e)}"
 
+    def stream(self, question: str) -> Generator[str, None, None]:
+        """
+        流式调用，逐字返回回答内容。
+        
+        Args:
+            question: 用户问题
+            
+        Yields:
+            str: 每次生成的文本片段
+        """
+        try:
+            url = f"{self.base_url}/v1/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "model": self.model,
+                "messages": self._build_messages(question),
+                "temperature": 0.7,
+                "stream": True
+            }
+            
+            resp = requests.post(url, headers=headers, json=payload, timeout=self.timeout, stream=True)
+            
+            if resp.status_code != 200:
+                log_.error(f"OpenAI-Compatible 流式调用失败: {resp.status_code} {resp.text[:200]}")
+                yield f"调用模型出错: HTTP {resp.status_code}"
+                return
+            
+            for line in resp.iter_lines():
+                if line:
+                    line = line.decode('utf-8')
+                    if line.startswith('data: '):
+                        data = line[6:]
+                        if data == '[DONE]':
+                            break
+                        try:
+                            chunk = json.loads(data)
+                            delta = chunk.get("choices", [{}])[0].get("delta", {})
+                            content = delta.get("content", "")
+                            if content:
+                                yield content
+                        except json.JSONDecodeError:
+                            continue
+                            
+        except Exception as e:
+            log_.error(f"OpenAI-Compatible 流式调用异常: {str(e)}")
+            yield f"调用模型出错: {str(e)}"

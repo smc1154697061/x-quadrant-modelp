@@ -285,6 +285,90 @@ class ApiService {
   }
 
   /**
+   * SSE流式请求
+   * @param {string} url - 请求URL
+   * @param {object} data - 请求数据
+   * @param {function} onMessage - 消息回调函数
+   * @param {function} onDone - 完成回调函数
+   * @param {function} onError - 错误回调函数
+   * @param {boolean} requireAuth - 是否需要认证
+   */
+  async stream(url, data = {}, onMessage, onDone, onError, requireAuth = true) {
+    const fullUrl = this.getFullUrl(url);
+    const header = {
+      'Content-Type': 'application/json'
+    };
+    
+    if (requireAuth) {
+      const token = safeGetStorage('token');
+      if (token) {
+        header['Authorization'] = `Bearer ${token}`;
+      } else {
+        this.showError('请先登录');
+        if (onError) onError(new Error('未登录'));
+        return;
+      }
+    }
+    
+    try {
+      const requestTask = uni.request({
+        url: fullUrl,
+        method: 'POST',
+        data: data,
+        header: header,
+        enableChunked: true,
+        responseType: 'text',
+        success: (res) => {
+          if (res.statusCode === 401) {
+            this.handleUnauthorized();
+            if (onError) onError(new Error('未授权，需要重新登录'));
+            return;
+          }
+          
+          if (res.statusCode !== 200) {
+            if (onError) onError(new Error(`请求失败: ${res.statusCode}`));
+            return;
+          }
+          
+          const responseText = res.data;
+          const lines = responseText.split('\n');
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const jsonStr = line.substring(6).trim();
+                if (!jsonStr) continue;
+                
+                const parsed = JSON.parse(jsonStr);
+                
+                if (parsed.code === 'STREAM' && parsed.data && parsed.data.content) {
+                  if (onMessage) onMessage(parsed.data.content);
+                } else if (parsed.code === 'DONE') {
+                  if (onDone) onDone(parsed.data);
+                } else if (parsed.code !== 'SUCCESS' && parsed.code !== 'STREAM' && parsed.code !== 'DONE') {
+                  if (onError) onError(new Error(parsed.message || '请求失败'));
+                  return;
+                }
+              } catch (e) {
+                console.warn('解析SSE数据失败:', e);
+              }
+            }
+          }
+        },
+        fail: (err) => {
+          console.error('流式请求失败:', err);
+          if (onError) onError(err);
+        }
+      });
+      
+      return requestTask;
+    } catch (error) {
+      console.error('流式请求异常:', error);
+      if (onError) onError(error);
+    }
+  }
+
+  /**
    * 文件上传
    */
   async upload(url, filePath, formData = {}, requireAuth = true) {

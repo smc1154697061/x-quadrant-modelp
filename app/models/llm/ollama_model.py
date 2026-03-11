@@ -3,6 +3,8 @@ from config.base import OLLAMA_MODEL, OLLAMA_BASE_URL, OLLAMA_TEMPERATURE
 from common import log_
 from common.error_codes import ModelCallError
 import threading
+from typing import Generator
+
 
 class OllamaModel:
     _instance = None
@@ -20,7 +22,6 @@ class OllamaModel:
         if hasattr(self, '_initialized') and self._initialized:
             return
             
-        # 首先检查Flask g对象中是否已有模型实例
         try:
             from flask import g
             if hasattr(g, 'llm_model') and g.llm_model is not None:
@@ -30,7 +31,6 @@ class OllamaModel:
         except:
             pass
             
-        # 其次检查应用上下文中是否有模型实例
         try:
             from flask import current_app
             if hasattr(current_app, 'llm_model') and current_app.llm_model is not None:
@@ -40,7 +40,6 @@ class OllamaModel:
         except:
             pass
         
-        # 如果没有找到已有实例，则创建新的
         self.llm = OllamaLLM(
             model=OLLAMA_MODEL,
             base_url=OLLAMA_BASE_URL,
@@ -54,5 +53,21 @@ class OllamaModel:
             return response
         except Exception as e:
             log_.error(f"模型调用失败: {str(e)}")
-            # 抛出ModelCallError异常而不是返回错误字符串
             raise ModelCallError(f"调用模型出错: {str(e)}")
+
+    def stream(self, question: str) -> Generator[str, None, None]:
+        """
+        流式调用，逐字返回回答内容。
+        
+        Args:
+            question: 用户问题
+            
+        Yields:
+            str: 每次生成的文本片段
+        """
+        try:
+            for chunk in self.llm.stream(question):
+                yield chunk
+        except Exception as e:
+            log_.error(f"模型流式调用失败: {str(e)}")
+            yield f"调用模型出错: {str(e)}"
