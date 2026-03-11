@@ -47,4 +47,61 @@ class OpenAICompatibleModel:
         except Exception as e:
             log_.error(f"OpenAI-Compatible 调用异常: {str(e)}")
             return f"调用模型出错: {str(e)}"
+    
+    def stream(self, question: str):
+        """
+        流式调用，逐字返回响应内容
+        与 OllamaModel 接口保持一致
+        
+        Args:
+            question: 用户问题/提示词
+            
+        Yields:
+            str: 每个token的文本内容
+        """
+        try:
+            url = f"{self.base_url}/v1/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "model": self.model,
+                "messages": self._build_messages(question),
+                "temperature": 0.7,
+                "stream": True  # 启用流式输出
+            }
+            
+            resp = requests.post(url, headers=headers, json=payload, timeout=self.timeout, stream=True)
+            if resp.status_code != 200:
+                log_.error(f"OpenAI-Compatible 流式调用失败: {resp.status_code} {resp.text[:200]}")
+                yield f"调用模型出错: HTTP {resp.status_code}"
+                return
+            
+            # 处理SSE流
+            for line in resp.iter_lines():
+                if line:
+                    line_text = line.decode('utf-8')
+                    # SSE格式: data: {...}
+                    if line_text.startswith('data: '):
+                        data_str = line_text[6:]  # 去掉 'data: ' 前缀
+                        if data_str == '[DONE]':
+                            break
+                        try:
+                            import json
+                            data = json.loads(data_str)
+                            # 提取delta中的content
+                            delta = data.get('choices', [{}])[0].get('delta', {})
+                            content = delta.get('content', '')
+                            if content:
+                                yield content
+                        except json.JSONDecodeError:
+                            continue
+                        except Exception as e:
+                            log_.warning(f"解析流式响应出错: {str(e)}")
+                            continue
+                            
+        except Exception as e:
+            log_.error(f"OpenAI-Compatible 流式调用异常: {str(e)}")
+            yield f"调用模型出错: {str(e)}"
 

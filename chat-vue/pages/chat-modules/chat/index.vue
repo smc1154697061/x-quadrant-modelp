@@ -387,6 +387,7 @@
 
 <script>
 import api from '@/utils/api.js';
+import { API_BASE_URL } from '@/utils/config.js';
 import { marked } from 'marked';
 import AppLayout from '@/components/layout/AppLayout.vue';
 import FilePreview from '@/components/file-preview/FilePreview.vue';
@@ -863,7 +864,7 @@ export default {
       // ...
     },
     
-    // 发送消息
+    // 发送消息（支持流式输出）
     async sendMessage() {
       const message = this.inputMessage.trim();
       const hasFile = !!this.selectedFile;
@@ -911,56 +912,153 @@ export default {
       
       try {
         if (!this.botId) throw new Error('缺少机器人信息');
-        let response;
         
-        if (this.conversationId) {
-          if (currentFile) {
-            response = await api.upload(
-              `/llm/conversations/${this.conversationId}`, 
-              currentFile, 
-              { question: message || '' }, 
-              true
-            );
-          } else {
-            response = await api.post(`/llm/conversations/${this.conversationId}`, { question: message }, true);
-          }
-        } else {
+        // 确保有会话ID
+        if (!this.conversationId) {
           const createResponse = await api.post('/llm/conversations', { bot_id: this.botId }, true);
           if (createResponse.code === 'SUCCESS') {
             this.conversationId = createResponse.data.id;
-            if (currentFile) {
-              response = await api.upload(
-                `/llm/conversations/${this.conversationId}`, 
-                currentFile, 
-                { question: message || '' }, 
-                true
-              );
-            } else {
-              response = await api.post(`/llm/conversations/${this.conversationId}`, { question: message }, true);
-            }
             if (this.isPc) this.fetchConversations();
           } else {
             throw new Error(createResponse.message || '创建对话失败');
           }
         }
         
+        // 使用流式输出
+        await this.sendMessageStream(message, currentFile);
+        
+      } catch (error) {
+        console.error('发送消息失败:', error);
+        this.handleSendMessageError(error);
+      } finally {
+        this.isTyping = false;
+      }
+    },
+    
+    // 流式发送消息
+    async sendMessageStream(message, currentFile) {
+      // 先添加一个空的AI消息占位
+      const aiMessageIndex = this.messages.length;
+      this.messages.push({
+        role: 'assistant',
+        content: '',
+        created_at: new Date().toISOString()
+      });
+      this.$set(this, 'displayMessages', [...this.messages]);
+      
+      try {
+        // 构建请求URL和参数
+        const url = `/llm/conversations/${this.conversationId}?stream=true`;
+        
+        // 准备请求数据
+        let requestOptions;
+        if (currentFile) {
+          // 有文件时使用FormData
+          const formData = new FormData();
+          formData.append('question', message || '');
+          formData.append('stream', 'true');
+          if (currentFile.fileObj) {
+            formData.append('file', currentFile.fileObj, currentFile.name);
+          }
+          
+          requestOptions = {
+            method: 'POST',
+            body: formData,
+            headers: {
+              'Authorization': `Bearer ${uni.getStorageSync('token') || ''}`
+            }
+          };
+        } else {
+          // 无文件时使用JSON
+          requestOptions = {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${uni.getStorageSync('token') || ''}`
+            },
+            body: JSON.stringify({ question: message, stream: true })
+          };
+        }
+        
+        // #ifdef H5
+        // H5环境使用fetch和ReadableStream
+        const baseUrl = API_BASE_URL || api.baseUrl || '';
+        // 移除末尾的/api，因为url已经以/开头
+        const apiBase = baseUrl.replace(/\/api$/, '');
+        const fullUrl = apiBase + url;
+        
+        const response = await fetch(fullUrl, requestOptions);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let fullContent = '';
+        
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n');
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (data.content) {
+                  fullContent += data.content;
+                  // 更新消息内容
+                  this.messages[aiMessageIndex].content = fullContent;
+                  this.$set(this, 'displayMessages', [...this.messages]);
+                  this.$nextTick(() => { this.scrollToBottom(); });
+                }
+                if (data.finished) {
+                  break;
+                }
+              } catch (e) {
+                // 忽略解析错误
+              }
+            }
+          }
+        }
+        
+        // 刷新对话列表
+        if (this.isPc) this.fetchConversations();
+        // #endif
+        
+        // #ifndef H5
+        // 非H5环境使用普通请求（uni-app不支持SSE）
+        let response;
+        if (currentFile) {
+          response = await api.upload(
+            `/llm/conversations/${this.conversationId}`, 
+            currentFile, 
+            { question: message || '', stream: false }, 
+            true
+          );
+        } else {
+          response = await api.post(`/llm/conversations/${this.conversationId}`, { question: message, stream: false }, true);
+        }
+        
         if (response && (response.code === 'SUCCESS' || response.code === '0000')) {
-          this.messages.push({
-            role: 'assistant',
-            content: response.data.answer,
-            created_at: new Date().toISOString()
-          });
+          this.messages[aiMessageIndex].content = response.data.answer;
           this.$set(this, 'displayMessages', [...this.messages]);
           if (this.isPc) this.fetchConversations();
           this.$nextTick(() => { this.scrollToBottom(); });
         } else {
           this.handleApiError(response);
         }
+        // #endif
+        
       } catch (error) {
-        console.error('发送消息失败:', error);
-        this.handleSendMessageError(error);
-      } finally {
-        this.isTyping = false;
+        console.error('流式输出失败:', error);
+        // 更新消息为错误信息
+        this.messages[aiMessageIndex].content = `获取回复失败：${error.message || '未知错误'}`;
+        this.messages[aiMessageIndex].isError = true;
+        this.$set(this, 'displayMessages', [...this.messages]);
       }
     },
     

@@ -49,10 +49,29 @@ class OllamaModel:
         self._initialized = True
 
     def invoke(self, question: str) -> str:
+        """非流式调用，返回完整响应"""
         try:
             response = self.llm.invoke(question)
             return response
         except Exception as e:
             log_.error(f"模型调用失败: {str(e)}")
             # 抛出ModelCallError异常而不是返回错误字符串
+            raise ModelCallError(f"调用模型出错: {str(e)}")
+    
+    def stream(self, question: str):
+        """流式调用，返回生成器，逐字输出响应
+        
+        Args:
+            question: 用户问题/提示词
+            
+        Yields:
+            str: 每个token的文本内容
+        """
+        try:
+            # 使用langchain的stream方法
+            for chunk in self.llm.stream(question):
+                if chunk:
+                    yield chunk
+        except Exception as e:
+            log_.error(f"模型流式调用失败: {str(e)}")
             raise ModelCallError(f"调用模型出错: {str(e)}")

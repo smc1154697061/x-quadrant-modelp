@@ -19,6 +19,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema import Document
 
 from common import log_
+from common.document_extractor import extract_content
 
 # 文本分割器配置
 DEFAULT_CHUNK_SIZE = 1000
@@ -40,9 +41,12 @@ LOADERS = {
     '.pptx': UnstructuredPowerPointLoader
 }
 
+# 图片文件扩展名列表
+IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff', '.tif'}
+
 def load_document(file_path: str) -> List[Document]:
     """
-    根据文件类型加载文档
+    根据文件类型加载文档，支持图片OCR解析
     
     Args:
         file_path: 文件路径
@@ -61,6 +65,42 @@ def load_document(file_path: str) -> List[Document]:
     # 检查文件是否为空
     if os.path.getsize(file_path) == 0:
         raise ValueError(f"文件为空: {file_path}")
+    
+    # 处理图片文件 - 使用OCR提取文字
+    if ext in IMAGE_EXTENSIONS:
+        try:
+            log_.info(f"检测到图片文件，使用OCR提取文字: {file_path}")
+            # 使用document_extractor提取图片中的文字
+            extracted_text = extract_content(file_path, file_type='image')
+            
+            if not extracted_text or extracted_text.strip() == '':
+                log_.warning(f"图片中未识别到文字: {file_path}")
+                extracted_text = "[图片中未识别到文字内容]"
+            
+            # 创建Document对象
+            doc = Document(
+                page_content=extracted_text,
+                metadata={
+                    'source': file_path,
+                    'file_type': 'image',
+                    'file_extension': ext
+                }
+            )
+            log_.info(f"图片OCR解析成功，提取文字长度: {len(extracted_text)}")
+            return [doc]
+        except Exception as e:
+            log_.error(f"图片OCR解析失败 {file_path}: {str(e)}")
+            # 返回一个包含错误信息的文档，而不是抛出异常
+            doc = Document(
+                page_content=f"[图片解析失败: {str(e)}]",
+                metadata={
+                    'source': file_path,
+                    'file_type': 'image',
+                    'file_extension': ext,
+                    'error': str(e)
+                }
+            )
+            return [doc]
     
     # 根据文件类型选择加载器
     if ext in LOADERS:

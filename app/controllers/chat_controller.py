@@ -12,7 +12,7 @@ from common.error_codes import APIException, ErrorCode, ParameterError, Resource
 import os
 import json
 import uuid
-from flask import request, g
+from flask import request, g, Response, stream_with_context
 from datetime import datetime
 import traceback
 from common.db_utils import get_db_connection
@@ -286,17 +286,45 @@ class ChatController(BaseResource):
             except Exception as e:
                 log_.error(f"保存AI回复失败: {str(e)}")
             
-            # 返回成功响应
-            result = {
-                "code": "SUCCESS",
-                "message": "回复成功",
-                "data": {
-                    'answer': response,
-                    'conversation_id': conversation_id
-                }
-            }
+            # 检查是否是流式输出请求
+            is_stream = params.get('stream', False) or request.args.get('stream', 'false').lower() == 'true'
+            
+            if is_stream:
+                # 流式输出模式
+                return self._send_message_stream(
+                    conversation_id=conversation_id,
+                    question=question,
+                    file_contents=file_contents,
+                    user_id=user_id
+                )
+            else:
+                # 非流式输出模式
+                # 保存AI回复到数据库
+                try:
+                    ai_message = MessageService.save_message(
+                        conversation_id=conversation_id,
+                        role='assistant',
+                        content=response
+                    )
+                    ai_message_id = ai_message.get('id')
+                    if ai_message_id:
+                        log_.debug(f"AI回复已成功保存到数据库，ID: {ai_message_id}")
+                    else:
+                        log_.error(f"AI回复未能保存到数据库，返回ID为空")
+                except Exception as e:
+                    log_.error(f"保存AI回复失败: {str(e)}")
                 
-            return result, 200
+                # 返回成功响应
+                result = {
+                    "code": "SUCCESS",
+                    "message": "回复成功",
+                    "data": {
+                        'answer': response,
+                        'conversation_id': conversation_id
+                    }
+                }
+                    
+                return result, 200
         except Exception as e:
             log_.error(f"发送消息失败: {str(e)}")
             return {
@@ -304,6 +332,75 @@ class ChatController(BaseResource):
                 "message": f"发送消息失败: {str(e)}",
                 "data": None
             }, 200
+    
+    def _send_message_stream(self, conversation_id, question, file_contents, user_id):
+        """流式发送消息，使用SSE格式返回"""
+        def generate():
+            full_response = ""
+            try:
+                # 调用chat_service处理请求（支持文件内容，流式模式）
+                if file_contents:
+                    response_generator = self.chat_service.get_chat_response_with_files(
+                        question=question,
+                        file_contents=file_contents,
+                        conversation_id=conversation_id,
+                        stream=True
+                    )
+                else:
+                    response_generator = self.chat_service.get_chat_response(
+                        question=question,
+                        conversation_id=conversation_id,
+                        stream=True
+                    )
+                
+                # 逐字输出
+                for chunk in response_generator:
+                    if chunk:
+                        full_response += chunk
+                        # SSE格式: data: {...}\n\n
+                        data = json.dumps({
+                            'content': chunk,
+                            'finished': False
+                        }, ensure_ascii=False)
+                        yield f"data: {data}\n\n"
+                
+                # 发送结束标记
+                data = json.dumps({
+                    'content': '',
+                    'finished': True,
+                    'full_response': full_response
+                }, ensure_ascii=False)
+                yield f"data: {data}\n\n"
+                
+                # 保存完整回复到数据库
+                try:
+                    ai_message = MessageService.save_message(
+                        conversation_id=conversation_id,
+                        role='assistant',
+                        content=full_response
+                    )
+                    log_.debug(f"流式AI回复已保存到数据库，ID: {ai_message.get('id')}")
+                except Exception as e:
+                    log_.error(f"保存流式AI回复失败: {str(e)}")
+                    
+            except Exception as e:
+                log_.error(f"流式输出异常: {str(e)}")
+                error_data = json.dumps({
+                    'error': str(e),
+                    'finished': True
+                }, ensure_ascii=False)
+                yield f"data: {error_data}\n\n"
+        
+        # 返回SSE响应
+        return Response(
+            stream_with_context(generate()),
+            mimetype='text/event-stream',
+            headers={
+                'Cache-Control': 'no-cache',
+                'X-Accel-Buffering': 'no',
+                'Connection': 'keep-alive'
+            }
+        )
             
     def create_conversation(self):
         """创建新对话"""

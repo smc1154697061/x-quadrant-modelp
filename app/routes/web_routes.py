@@ -27,6 +27,9 @@ def output_json_with_dates(data, code, headers=None):
 # 设置API使用自定义的JSON表示
 api.representations = {'application/json': output_json_with_dates}
 
+# 注意：ChatController 被多个路由共享，不要在任何路由中使用 methods 参数
+# 因为 Flask-RESTful 的 methods 是类属性，会影响所有使用该类的路由
+
 # 使用统一的 /llm 前缀
 # 机器人API - 使用ChatController处理
 api.add_resource(ChatController, '/llm/bots', endpoint='bots')
@@ -40,27 +43,27 @@ api.add_resource(ChatController, '/llm/conversations/<int:conversation_id>', end
 api.add_resource(ExtractionController, '/llm/extract')
 
 # 知识库管理API
-api.add_resource(KnowledgeBaseController, '/llm/knowledge-bases', endpoint='knowledge_bases', methods=['GET', 'POST'])
-api.add_resource(KnowledgeBaseController, '/llm/knowledge-bases/<string:kb_id>', endpoint='kb_detail', methods=['GET', 'PUT', 'DELETE'])
+api.add_resource(KnowledgeBaseController, '/llm/knowledge-bases', endpoint='knowledge_bases')
+api.add_resource(KnowledgeBaseController, '/llm/knowledge-bases/<string:kb_id>', endpoint='kb_detail')
 api.add_resource(KnowledgeBaseBasicController, '/llm/knowledge-bases/basic')
 
 # 文档管理API - 保持 /llm 前缀
 api.add_resource(SimpleKnowledgeController, '/llm/documents', endpoint='documents')
-api.add_resource(SimpleKnowledgeController, '/llm/documents/<string:document_id>', endpoint='document_detail', methods=['GET', 'DELETE', 'PUT'])
-api.add_resource(SimpleKnowledgeController, '/llm/upload-document', endpoint='upload_document', methods=['POST'])
+api.add_resource(SimpleKnowledgeController, '/llm/documents/<string:document_id>', endpoint='document_detail')
+api.add_resource(SimpleKnowledgeController, '/llm/upload-document', endpoint='upload_document')
 
 # 知识库文件列表API
 api.add_resource(KnowledgeBaseFilesController, '/llm/knowledge-bases/<string:kb_id>/files', endpoint='kb_files')
 
 # 添加身份验证相关路由
-api.add_resource(AuthCodeResource, '/auth/send-code', endpoint='send_code', methods=['POST', 'OPTIONS'])
-api.add_resource(AuthLoginRegisterResource, '/auth/login-register', endpoint='login_register', methods=['POST', 'OPTIONS'])
-api.add_resource(AuthVerifyTokenResource, '/auth/verify-token', endpoint='verify_token', methods=['POST', 'OPTIONS'])
+api.add_resource(AuthCodeResource, '/auth/send-code', endpoint='send_code')
+api.add_resource(AuthLoginRegisterResource, '/auth/login-register', endpoint='login_register')
+api.add_resource(AuthVerifyTokenResource, '/auth/verify-token', endpoint='verify_token')
 
-# 添加处理未保存聊天的API
-api.add_resource(ChatController, '/llm/chat', endpoint='unsaved_chat', methods=['POST'])
+# 添加处理未保存聊天的API - 注意：不要指定methods，让Flask-RESTful自动检测
+api.add_resource(ChatController, '/llm/chat', endpoint='unsaved_chat')
 
 # 文件预览和下载API
-api.add_resource(FileController, '/llm/files/<int:document_id>', endpoint='file_preview', methods=['GET'])
+api.add_resource(FileController, '/llm/files/<int:document_id>', endpoint='file_preview')
 
 # 这里可以添加更多前端需要的路由
