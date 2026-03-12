@@ -53,9 +53,23 @@
 			}
 		},
 		{
-			"path": "pages/tools/extraction/index",
+		"path": "pages/tools/extraction/index",
 			"style": {
 				"navigationBarTitleText": "内容提取",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/tools/template-manage/index",
+			"style": {
+				"navigationBarTitleText": "模板管理",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/tools/template-generate/index",
+			"style": {
+				"navigationBarTitleText": "文档生成",
 				"navigationStyle": "custom"
 			}
 		},
