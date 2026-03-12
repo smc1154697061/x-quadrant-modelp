@@ -8,7 +8,7 @@ from app.controllers.extraction_controller import ExtractionController
 from app.controllers.knowledge_controller import SimpleKnowledgeController, KnowledgeBaseController, KnowledgeBaseFilesController, KnowledgeBaseBasicController
 from app.controllers.auth_controller import AuthCodeResource, AuthLoginRegisterResource, AuthVerifyTokenResource
 from app.controllers.file_controller import FileController
-from app.controllers.document_template_controller import DocumentTemplateController, DocumentGenerationController, GenerationHistoryController
+from app.controllers.document_template_controller import DocumentTemplateController, DocumentGenerationController, GenerationHistoryController, DocumentExportController
 from app.services.chat_service import ChatService
 from app.services.bot_service import BotService
 from common import log_
@@ -44,39 +44,42 @@ api.add_resource(ChatController, '/llm/conversations/<int:conversation_id>', end
 api.add_resource(ExtractionController, '/llm/extract')
 
 # 知识库管理API
-api.add_resource(KnowledgeBaseController, '/llm/knowledge-bases', endpoint='knowledge_bases', methods=['GET', 'POST'])
-api.add_resource(KnowledgeBaseController, '/llm/knowledge-bases/<string:kb_id>', endpoint='kb_detail', methods=['GET', 'PUT', 'DELETE'])
+api.add_resource(KnowledgeBaseController, '/llm/knowledge-bases', endpoint='knowledge_bases')
+api.add_resource(KnowledgeBaseController, '/llm/knowledge-bases/<string:kb_id>', endpoint='kb_detail')
 api.add_resource(KnowledgeBaseBasicController, '/llm/knowledge-bases/basic')
 
 # 文档管理API - 保持 /llm 前缀
 api.add_resource(SimpleKnowledgeController, '/llm/documents', endpoint='documents')
-api.add_resource(SimpleKnowledgeController, '/llm/documents/<string:document_id>', endpoint='document_detail', methods=['GET', 'DELETE', 'PUT'])
-api.add_resource(SimpleKnowledgeController, '/llm/upload-document', endpoint='upload_document', methods=['POST'])
+api.add_resource(SimpleKnowledgeController, '/llm/documents/<string:document_id>', endpoint='document_detail')
+api.add_resource(SimpleKnowledgeController, '/llm/upload-document', endpoint='upload_document')
 
 # 知识库文件列表API
 api.add_resource(KnowledgeBaseFilesController, '/llm/knowledge-bases/<string:kb_id>/files', endpoint='kb_files')
 
 # 添加身份验证相关路由
-api.add_resource(AuthCodeResource, '/auth/send-code', endpoint='send_code', methods=['POST', 'OPTIONS'])
-api.add_resource(AuthLoginRegisterResource, '/auth/login-register', endpoint='login_register', methods=['POST', 'OPTIONS'])
-api.add_resource(AuthVerifyTokenResource, '/auth/verify-token', endpoint='verify_token', methods=['POST', 'OPTIONS'])
+api.add_resource(AuthCodeResource, '/auth/send-code', endpoint='send_code')
+api.add_resource(AuthLoginRegisterResource, '/auth/login-register', endpoint='login_register')
+api.add_resource(AuthVerifyTokenResource, '/auth/verify-token', endpoint='verify_token')
 
 # 添加处理未保存聊天的API
-api.add_resource(ChatController, '/llm/chat', endpoint='unsaved_chat', methods=['POST'])
+api.add_resource(ChatController, '/llm/chat', endpoint='unsaved_chat')
 
 # 文件预览和下载API
-api.add_resource(FileController, '/llm/files/<int:document_id>', endpoint='file_preview', methods=['GET'])
+api.add_resource(FileController, '/llm/files/<int:document_id>', endpoint='file_preview')
 
 # 文档模板API
-api.add_resource(DocumentTemplateController, '/llm/templates', endpoint='templates', methods=['GET', 'POST'])
-api.add_resource(DocumentTemplateController, '/llm/templates/<int:template_id>', endpoint='template_detail', methods=['GET', 'DELETE'])
+api.add_resource(DocumentTemplateController, '/llm/templates', endpoint='templates')
+api.add_resource(DocumentTemplateController, '/llm/templates/<int:template_id>', endpoint='template_detail')
 
 # 文档生成API
-api.add_resource(DocumentGenerationController, '/llm/generate', endpoint='generate_document', methods=['POST'])
+api.add_resource(DocumentGenerationController, '/llm/generate', endpoint='generate_document')
 
 # 生成历史API
-api.add_resource(GenerationHistoryController, '/llm/generations', endpoint='generations', methods=['GET'])
-api.add_resource(GenerationHistoryController, '/llm/generations/<int:generation_id>', endpoint='generation_detail', methods=['GET'])
+api.add_resource(GenerationHistoryController, '/llm/generations', endpoint='generations')
+api.add_resource(GenerationHistoryController, '/llm/generations/<int:generation_id>', endpoint='generation_detail')
+
+# 文档导出API
+api.add_resource(DocumentExportController, '/llm/generations/<int:generation_id>/export', endpoint='generation_export')
 
 # 流式聊天API - 使用蓝图直接注册以避免RESTful的JSON序列化
 stream_chat_service = ChatService()

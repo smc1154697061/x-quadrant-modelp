@@ -68,25 +68,10 @@
 			}
 		},
 		{
-			"path": "pages/tools/template-generate/index",
+			"path": "pages/tools/smart-template/index",
 			"style": {
-				"navigationBarTitleText": "文档生成",
+				"navigationBarTitleText": "智能模板",
 				"navigationStyle": "custom"
-			}
-		},
-		{
-			"path": "pages/tools/template-result/index",
-			"style": {
-				"navigationBarTitleText": "生成结果",
-				"navigationStyle": "custom"
-			}
-		},
-		{
-			"path": "pages/tools/template-history/index",
-			"style": {
-				"navigationBarTitleText": "生成历史",
-				"navigationStyle": "custom",
-				"enablePullDownRefresh": true
 			}
 		},
 		{

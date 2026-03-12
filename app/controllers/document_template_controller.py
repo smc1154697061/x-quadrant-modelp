@@ -4,12 +4,12 @@
 import os
 import uuid
 from flask import request, g
-from flask_restful import Resource
+from app.controllers.base import BaseResource
 from common import log_
 from app.services.document_template_service import DocumentTemplateService
 
 
-class DocumentTemplateController(Resource):
+class DocumentTemplateController(BaseResource):
     """文档模板控制器"""
     
     def __init__(self):
@@ -73,8 +73,9 @@ class DocumentTemplateController(Resource):
             name = request.form.get('name', file.filename)
             tags = request.form.get('tags', '')
             
-            # 保存临时文件
-            temp_dir = '/tmp'
+            # 保存临时文件（使用系统临时目录，兼容Windows）
+            import tempfile
+            temp_dir = tempfile.gettempdir()
             os.makedirs(temp_dir, exist_ok=True)
             temp_path = os.path.join(temp_dir, f"{uuid.uuid4()}_{file.filename}")
             file.save(temp_path)
@@ -107,7 +108,9 @@ class DocumentTemplateController(Resource):
                 return {'code': 'SYSTEM_ERROR', 'message': result['message']}, 500
         
         except Exception as e:
-            log_.error(f"上传模板失败: {str(e)}")
+            import traceback
+            error_detail = traceback.format_exc()
+            log_.error(f"上传模板失败: {str(e)}\n详细错误:\n{error_detail}")
             return {'code': 'SYSTEM_ERROR', 'message': f'上传失败: {str(e)}'}, 500
     
     def delete(self, template_id):
@@ -134,7 +137,7 @@ class DocumentTemplateController(Resource):
             return {'code': 'SYSTEM_ERROR', 'message': f'删除失败: {str(e)}'}, 500
 
 
-class DocumentGenerationController(Resource):
+class DocumentGenerationController(BaseResource):
     """文档生成控制器"""
     
     def __init__(self):
@@ -181,7 +184,7 @@ class DocumentGenerationController(Resource):
             return {'code': 'SYSTEM_ERROR', 'message': f'生成失败: {str(e)}'}, 500
 
 
-class GenerationHistoryController(Resource):
+class GenerationHistoryController(BaseResource):
     """生成历史控制器"""
     
     def __init__(self):
@@ -223,3 +226,40 @@ class GenerationHistoryController(Resource):
         except Exception as e:
             log_.error(f"获取生成历史失败: {str(e)}")
             return {'code': 'SYSTEM_ERROR', 'message': f'获取失败: {str(e)}'}, 500
+
+
+class DocumentExportController(BaseResource):
+    """文档导出控制器"""
+    
+    def __init__(self):
+        self.service = DocumentTemplateService()
+    
+    def get(self, generation_id):
+        """
+        导出生成的文档为Word或PDF
+        """
+        from flask import send_file
+        
+        user_id = getattr(g, 'user_id', None)
+        if not user_id:
+            return {'code': 'UNAUTHORIZED', 'message': '请先登录'}, 401
+        
+        try:
+            export_format = request.args.get('format', 'word')
+            
+            result = self.service.export_generation(generation_id, user_id, export_format)
+            
+            if not result['success']:
+                return {'code': 'SYSTEM_ERROR', 'message': result['message']}, 500
+            
+            # 返回文件下载
+            return send_file(
+                result['file_path'],
+                mimetype=result['content_type'],
+                as_attachment=True,
+                download_name=result['file_name']
+            )
+        
+        except Exception as e:
+            log_.error(f"导出文档失败: {str(e)}")
+            return {'code': 'SYSTEM_ERROR', 'message': f'导出失败: {str(e)}'}, 500
