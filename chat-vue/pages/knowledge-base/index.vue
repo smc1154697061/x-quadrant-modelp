@@ -67,6 +67,55 @@
             </view>
           </view>
           
+          <!-- 分块配置区域 -->
+          <view class="form-section">
+            <text class="section-label">分块配置</text>
+            
+            <view class="form-item">
+              <text class="form-label">分块策略</text>
+              <view class="strategy-selector">
+                <view 
+                  v-for="strategy in chunkingStrategies" 
+                  :key="strategy.value"
+                  class="strategy-option"
+                  :class="{ 'active': newKB.chunking_strategy === strategy.value }"
+                  @tap="selectStrategy(strategy.value)"
+                >
+                  <text class="strategy-name">{{ strategy.label }}</text>
+                  <text class="strategy-desc">{{ strategy.description }}</text>
+                </view>
+              </view>
+            </view>
+            
+            <view class="form-row">
+              <view class="form-item half">
+                <text class="form-label">分块大小</text>
+                <view class="input-wrapper">
+                  <input 
+                    type="number" 
+                    v-model.number="newKB.chunk_size"
+                    placeholder="1000" 
+                    class="basic-input"
+                  />
+                </view>
+                <text class="form-hint">字符数 (100-8000)</text>
+              </view>
+              
+              <view class="form-item half">
+                <text class="form-label">重叠大小</text>
+                <view class="input-wrapper">
+                  <input 
+                    type="number" 
+                    v-model.number="newKB.chunk_overlap"
+                    placeholder="200" 
+                    class="basic-input"
+                  />
+                </view>
+                <text class="form-hint">字符数</text>
+              </view>
+            </view>
+          </view>
+          
           <view class="dialog-buttons">
             <button class="cancel-btn" @tap="cancelCreateKB" :disabled="creating">取消</button>
             <button class="confirm-btn" @tap="confirmCreateKB" :disabled="!newKB.name || creating">
@@ -77,10 +126,10 @@
         </view>
       </view>
       
-      <!-- 重命名资料库弹窗 -->
+      <!-- 重命名/编辑资料库弹窗 -->
       <view v-if="showRenameKB" class="dialog rename-kb-dialog">
         <view class="dialog-content" @tap.stop>
-          <text class="dialog-title">重命名知识资料库</text>
+          <text class="dialog-title">编辑知识资料库</text>
           
           <view class="form-item">
             <text class="form-label">资料库名称</text>
@@ -107,6 +156,55 @@
                 @focus="focusRenameDescInput"
                 @blur="isRenameDescFocused = false"
               ></textarea>
+            </view>
+          </view>
+          
+          <!-- 分块配置区域 -->
+          <view class="form-section">
+            <text class="section-label">分块配置</text>
+            
+            <view class="form-item">
+              <text class="form-label">分块策略</text>
+              <view class="strategy-selector">
+                <view 
+                  v-for="strategy in chunkingStrategies" 
+                  :key="strategy.value"
+                  class="strategy-option"
+                  :class="{ 'active': editKB.chunking_strategy === strategy.value }"
+                  @tap="selectEditStrategy(strategy.value)"
+                >
+                  <text class="strategy-name">{{ strategy.label }}</text>
+                  <text class="strategy-desc">{{ strategy.description }}</text>
+                </view>
+              </view>
+            </view>
+            
+            <view class="form-row">
+              <view class="form-item half">
+                <text class="form-label">分块大小</text>
+                <view class="input-wrapper">
+                  <input 
+                    type="number" 
+                    v-model.number="editKB.chunk_size"
+                    placeholder="1000" 
+                    class="basic-input"
+                  />
+                </view>
+                <text class="form-hint">字符数 (100-8000)</text>
+              </view>
+              
+              <view class="form-item half">
+                <text class="form-label">重叠大小</text>
+                <view class="input-wrapper">
+                  <input 
+                    type="number" 
+                    v-model.number="editKB.chunk_overlap"
+                    placeholder="200" 
+                    class="basic-input"
+                  />
+                </view>
+                <text class="form-hint">字符数</text>
+              </view>
             </view>
           </view>
           
@@ -145,21 +243,37 @@ export default {
       knowledgeBases: [],
       loadingKBs: false,
       
+      // 分块策略列表
+      chunkingStrategies: [],
+      defaultChunkingConfig: {
+        chunking_strategy: 'fixed',
+        chunk_size: 1000,
+        chunk_overlap: 200
+      },
+      
       // 创建知识库相关
       showCreateKB: false,
       creating: false,
       newKB: {
         name: '',
-        description: ''
+        description: '',
+        chunking_strategy: 'fixed',
+        chunk_size: 1000,
+        chunk_overlap: 200
       },
       isNameFocused: false,
       isDescFocused: false,
       
-      // 重命名知识库相关
+      // 编辑知识库相关
       showRenameKB: false,
       renameKBId: null,
       newKBName: '',
       newKBDesc: '',
+      editKB: {
+        chunking_strategy: 'fixed',
+        chunk_size: 1000,
+        chunk_overlap: 200
+      },
       isRenameNameFocused: false,
       isRenameDescFocused: false,
       
@@ -173,6 +287,9 @@ export default {
     // 获取用户信息 - 只从本地存储获取一次
     this.userInfo = getCurrentUser();
     this.isLoggedIn = !!this.userInfo;
+    
+    // 加载分块策略
+    this.fetchChunkingStrategies();
     
     // 加载知识库列表
     this.fetchKnowledgeBases();
@@ -316,6 +433,39 @@ export default {
       });
     },
     
+    // 获取分块策略列表
+    async fetchChunkingStrategies() {
+      try {
+        const result = await api.get('/llm/chunking-strategies');
+        if (result && (result.code === '0000' || result.code === 'SUCCESS')) {
+          this.chunkingStrategies = result.data.strategies || [];
+          this.defaultChunkingConfig = result.data.defaults || {
+            chunking_strategy: 'fixed',
+            chunk_size: 1000,
+            chunk_overlap: 200
+          };
+        }
+      } catch (error) {
+        console.error('获取分块策略失败:', error);
+        // 使用默认策略
+        this.chunkingStrategies = [
+          { value: 'fixed', label: '固定长度', description: '按固定字符长度分割，适合大多数场景' },
+          { value: 'sentence', label: '句子边界', description: '优先按句子边界分割，保持语义完整性' },
+          { value: 'semantic', label: '语义分块', description: '基于段落和语义边界分割，适合长文档' }
+        ];
+      }
+    },
+
+    // 选择分块策略（创建）
+    selectStrategy(strategy) {
+      this.newKB.chunking_strategy = strategy;
+    },
+
+    // 选择分块策略（编辑）
+    selectEditStrategy(strategy) {
+      this.editKB.chunking_strategy = strategy;
+    },
+
     // 显示创建资料库弹窗
     showCreateKBDialog() {
       // 检查用户是否已登录
@@ -331,10 +481,13 @@ export default {
         });
         return;
       }
-      
+
       this.newKB = {
         name: '',
-        description: ''
+        description: '',
+        chunking_strategy: this.defaultChunkingConfig.chunking_strategy,
+        chunk_size: this.defaultChunkingConfig.chunk_size,
+        chunk_overlap: this.defaultChunkingConfig.chunk_overlap
       };
       this.showCreateKB = true;
     },
@@ -372,7 +525,10 @@ export default {
         // 构建请求数据
         const requestData = {
           name: this.newKB.name,
-          description: this.newKB.description || ''
+          description: this.newKB.description || '',
+          chunking_strategy: this.newKB.chunking_strategy,
+          chunk_size: parseInt(this.newKB.chunk_size) || 1000,
+          chunk_overlap: parseInt(this.newKB.chunk_overlap) || 200
         };
         
         // 实际API调用
@@ -429,10 +585,16 @@ export default {
         });
         return;
       }
-      
+
       this.renameKBId = kb.id;
       this.newKBName = kb.name;
       this.newKBDesc = kb.description || '';
+      // 加载分块配置
+      this.editKB = {
+        chunking_strategy: kb.chunking_strategy || 'fixed',
+        chunk_size: kb.chunk_size || 1000,
+        chunk_overlap: kb.chunk_overlap || 200
+      };
       this.showRenameKB = true;
     },
     
@@ -468,12 +630,15 @@ export default {
         // 实际API调用
         const result = await api.put(`/llm/knowledge-bases/${this.renameKBId}`, {
           name: this.newKBName,
-          description: this.newKBDesc || ''
+          description: this.newKBDesc || '',
+          chunking_strategy: this.editKB.chunking_strategy,
+          chunk_size: parseInt(this.editKB.chunk_size) || 1000,
+          chunk_overlap: parseInt(this.editKB.chunk_overlap) || 200
         });
-        
+
         if (result && (result.code === '0000')) {
           api.showSuccess('知识库更新成功');
-          
+
           // 刷新知识库列表
           this.fetchKnowledgeBases();
         } else {
@@ -483,7 +648,7 @@ export default {
         console.error('更新知识库失败:', error);
         api.showError('更新知识库失败');
       }
-      
+
       this.showRenameKB = false;
       this.renameKBId = null;
     },
@@ -1072,5 +1237,79 @@ page .basic-input, page .basic-textarea {
 .input-wrapper.focus-within textarea {
   border-color: var(--primary-color, #007AFF) !important;
   box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.1) !important;
+}
+
+/* 分块配置区域样式 */
+.form-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #eee;
+}
+
+.section-label {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 15px;
+}
+
+.strategy-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.strategy-option {
+  padding: 12px 15px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background-color: #f8f9fa;
+}
+
+.strategy-option.active {
+  border-color: var(--primary-color, #007AFF);
+  background-color: rgba(0, 122, 255, 0.05);
+}
+
+.strategy-name {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.strategy-desc {
+  display: block;
+  font-size: 12px;
+  color: #666;
+}
+
+.form-row {
+  display: flex;
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.form-item.half {
+  flex: 1;
+}
+
+.form-hint {
+  display: block;
+  font-size: 12px;
+  color: #999;
+  margin-top: 5px;
+}
+
+/* 响应式调整 */
+@media screen and (max-width: 767px) {
+  .form-row {
+    flex-direction: column;
+    gap: 10px;
+  }
 }
 </style> 

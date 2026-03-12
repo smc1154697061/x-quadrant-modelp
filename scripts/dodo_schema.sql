@@ -82,10 +82,16 @@ CREATE TABLE "public"."dodo_knowledge_bases" (
     "description" text,
     "created_by" int4 NOT NULL,
     "is_public" bool DEFAULT false,
+    "chunking_strategy" varchar(20) DEFAULT 'fixed',
+    "chunk_size" int4 DEFAULT 1000,
+    "chunk_overlap" int4 DEFAULT 200,
     "created_at" timestamptz(6) DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY ("id"),
     FOREIGN KEY ("created_by") REFERENCES "public"."dodo_users" ("id") ON DELETE NO ACTION
 );
+COMMENT ON COLUMN "public"."dodo_knowledge_bases"."chunking_strategy" IS '分块策略: fixed-固定长度, semantic-语义分块, sentence-句子分块';
+COMMENT ON COLUMN "public"."dodo_knowledge_bases"."chunk_size" IS '分块大小(字符数)';
+COMMENT ON COLUMN "public"."dodo_knowledge_bases"."chunk_overlap" IS '分块重叠大小(字符数)';
 
 -- 文档表（独立文档库，无kb_id）
 CREATE TABLE "public"."dodo_documents" (

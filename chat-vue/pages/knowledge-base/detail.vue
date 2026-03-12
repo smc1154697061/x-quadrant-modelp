@@ -18,6 +18,21 @@
             <template v-else>
               <text class="kb-name">{{ knowledgeBase.name }}</text>
               <text class="kb-description">{{ knowledgeBase.description || '无描述' }}</text>
+              <!-- 分块配置信息 -->
+              <view class="kb-chunking-config" v-if="knowledgeBase.chunking_strategy">
+                <view class="config-item">
+                  <text class="config-label">分块策略:</text>
+                  <text class="config-value">{{ formatChunkingStrategy(knowledgeBase.chunking_strategy) }}</text>
+                </view>
+                <view class="config-item">
+                  <text class="config-label">分块大小:</text>
+                  <text class="config-value">{{ knowledgeBase.chunk_size || 1000 }} 字符</text>
+                </view>
+                <view class="config-item">
+                  <text class="config-label">重叠大小:</text>
+                  <text class="config-value">{{ knowledgeBase.chunk_overlap || 200 }} 字符</text>
+                </view>
+              </view>
             </template>
           </view>
           
@@ -784,6 +799,16 @@ export default {
       };
       return statusMap[status] || status;
     },
+
+    // 格式化分块策略
+    formatChunkingStrategy(strategy) {
+      const strategyMap = {
+        'fixed': '固定长度',
+        'sentence': '句子边界',
+        'semantic': '语义分块'
+      };
+      return strategyMap[strategy] || strategy;
+    },
     
     // 处理文档（向量化）
     async processDocument(docId) {
@@ -984,6 +1009,33 @@ export default {
 .kb-description {
   font-size: 14px;
   color: #666;
+}
+
+.kb-chunking-config {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.config-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.config-label {
+  font-size: 12px;
+  color: #999;
+}
+
+.config-value {
+  font-size: 12px;
+  color: #333;
+  font-weight: 500;
 }
 
 .login-hint-inline {

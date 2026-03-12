@@ -12,13 +12,18 @@ class KnowledgeBase(BaseEntity):
     _primary_key = 'id'
     
     def __init__(self, id=None, name=None, description=None, created_by=None,
-                 is_public=None, created_at=None, **kwargs):
+                 is_public=None, created_at=None, chunking_strategy=None,
+                 chunk_size=None, chunk_overlap=None, **kwargs):
         self.id = id
         self.name = name
         self.description = description
         self.created_by = created_by
         self.is_public = is_public if is_public is not None else False
         self.created_at = created_at
+        # 分块配置字段，保持向后兼容
+        self.chunking_strategy = chunking_strategy or 'fixed'
+        self.chunk_size = chunk_size or 1000
+        self.chunk_overlap = chunk_overlap or 200
         # 处理额外的字段
         for key, value in kwargs.items():
             setattr(self, key, value)
