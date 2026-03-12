@@ -18,7 +18,8 @@ from common.db_utils import get_db_connection
 from app.entity.knowledge_base import KnowledgeBase, Document, DocumentChunk
 from app.dao.knowledge_dao import KnowledgeBaseDAO, DocumentDAO, DocumentChunkDAO
 from common.error_codes import APIException, ErrorCode
-from app.utils.document_loader import load_document, split_document
+from app.utils.document_loader import load_document
+from app.utils.chunkers import ChunkerFactory
 
 class KnowledgeService:
     """知识库服务类"""
@@ -120,7 +121,10 @@ class KnowledgeService:
                 name=dto.name,
                 description=dto.description,
                 created_by=user_id,
-                is_public=False
+                is_public=False,
+                chunking_strategy=dto.chunking_strategy,
+                chunk_size=dto.chunk_size,
+                chunk_overlap=dto.chunk_overlap
             )
             
             # 调用DAO创建
@@ -626,9 +630,19 @@ class KnowledgeService:
                 DocumentDAO().update_status(document_id, "failed")
                 return
             
+            # 获取文档所属的知识库分块配置
+            chunking_config = self._get_document_chunking_config(document_id)
+            log_.info(f"文档 {document_id} 使用分块配置: {chunking_config}")
+            
             # 分割文档
             try:
-                chunks = split_document(doc)
+                # 使用知识库的分块配置创建分块器
+                chunker = ChunkerFactory.create_chunker(
+                    strategy=chunking_config.get('chunking_strategy', 'fixed'),
+                    chunk_size=chunking_config.get('chunk_size', 1000),
+                    chunk_overlap=chunking_config.get('chunk_overlap', 200)
+                )
+                chunks = chunker.split(doc)
 
                 # 限制分块数量，防止资源过度占用
                 max_chunks = 1000
@@ -907,3 +921,50 @@ class KnowledgeService:
         except Exception as e:
             log_.error(f"获取知识库列表失败: {str(e)}")
             raise APIException(ErrorCode.SYSTEM_ERROR, msg=f"获取知识库列表失败: {str(e)}")
+    
+    def _get_document_chunking_config(self, document_id):
+        """
+        获取文档所属知识库的分块配置
+        
+        Args:
+            document_id: 文档ID
+            
+        Returns:
+            dict: 分块配置字典
+        """
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cursor:
+                    # 查询文档所属知识库的分块配置
+                    cursor.execute("""
+                        SELECT kb.chunking_strategy, kb.chunk_size, kb.chunk_overlap
+                        FROM dodo_knowledge_bases kb
+                        INNER JOIN dodo_kb_documents kbd ON kb.id = kbd.kb_id
+                        WHERE kbd.document_id = %s
+                        LIMIT 1
+                    """, (document_id,))
+                    
+                    result = cursor.fetchone()
+                    
+                    if result:
+                        return {
+                            'chunking_strategy': result[0] or 'fixed',
+                            'chunk_size': result[1] or 1000,
+                            'chunk_overlap': result[2] or 200
+                        }
+                    else:
+                        # 文档不属于任何知识库，使用默认配置
+                        log_.warning(f"文档 {document_id} 不属于任何知识库，使用默认分块配置")
+                        return {
+                            'chunking_strategy': 'fixed',
+                            'chunk_size': 1000,
+                            'chunk_overlap': 200
+                        }
+        except Exception as e:
+            log_.error(f"获取文档分块配置失败: {str(e)}")
+            # 出错时使用默认配置
+            return {
+                'chunking_strategy': 'fixed',
+                'chunk_size': 1000,
+                'chunk_overlap': 200
+            }

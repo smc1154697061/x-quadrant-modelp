@@ -73,6 +73,57 @@ class KnowledgeBaseController(BaseResource):
     
     @api_exception_handler
     @login_required
+    def put(self, kb_id=None):
+        """更新知识库信息（包括分块配置）"""
+        try:
+            if not kb_id:
+                return {
+                    "code": ErrorCode.VALIDATION_ERROR.code,
+                    "message": "未指定知识库ID",
+                    "data": None
+                }, 400
+            
+            # 获取请求数据
+            data = self.get_params()
+            
+            # 创建DTO并校验
+            from app.entity.dto.knowledge_dto import KnowledgeBaseUpdateDTO
+            dto = KnowledgeBaseUpdateDTO.from_request(data)
+            dto.validate()
+            
+            # 调用DAO更新
+            from app.dao.knowledge_dao import KnowledgeBaseDAO
+            result = KnowledgeBaseDAO.update(kb_id, dto.to_dict())
+            
+            if result:
+                return {
+                    "code": ErrorCode.SUCCESS.code,
+                    "message": "知识库更新成功",
+                    "data": None
+                }, 200
+            else:
+                return {
+                    "code": ErrorCode.RESOURCE_NOT_FOUND.code,
+                    "message": "知识库不存在",
+                    "data": None
+                }, 404
+                
+        except APIException as e:
+            return {
+                "code": e.code,
+                "message": e.message,
+                "data": None
+            }, 400
+        except Exception as e:
+            log_.error(f"更新知识库失败: {str(e)}")
+            return {
+                "code": ErrorCode.SYSTEM_ERROR.code,
+                "message": f"更新知识库失败: {str(e)}",
+                "data": None
+            }, 500
+    
+    @api_exception_handler
+    @login_required
     def delete(self, kb_id):
         """删除知识库"""
         try:
@@ -125,6 +176,26 @@ class KnowledgeBaseController(BaseResource):
             "code": ErrorCode.SUCCESS.code,
             "message": ErrorCode.SUCCESS.message,
             "data": kb_list
+        }, 200
+    
+    @api_exception_handler
+    def get_chunking_strategies(self):
+        """获取可用的分块策略列表"""
+        from app.utils.chunkers import ChunkerFactory
+        
+        strategies = ChunkerFactory.get_available_strategies()
+        
+        return {
+            "code": ErrorCode.SUCCESS.code,
+            "message": ErrorCode.SUCCESS.message,
+            "data": {
+                "strategies": strategies,
+                "defaults": {
+                    "chunking_strategy": ChunkerFactory.DEFAULT_STRATEGY,
+                    "chunk_size": ChunkerFactory.DEFAULT_CHUNK_SIZE,
+                    "chunk_overlap": ChunkerFactory.DEFAULT_CHUNK_OVERLAP
+                }
+            }
         }, 200
 
 class SimpleKnowledgeController(BaseResource):

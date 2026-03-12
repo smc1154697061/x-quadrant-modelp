@@ -47,6 +47,28 @@ api.add_resource(KnowledgeBaseController, '/llm/knowledge-bases', endpoint='know
 api.add_resource(KnowledgeBaseController, '/llm/knowledge-bases/<string:kb_id>', endpoint='kb_detail', methods=['GET', 'PUT', 'DELETE'])
 api.add_resource(KnowledgeBaseBasicController, '/llm/knowledge-bases/basic')
 
+# 分块策略API
+@frontend_bp.route('/llm/chunking-strategies', methods=['GET'])
+def get_chunking_strategies():
+    """获取可用的分块策略列表"""
+    from app.utils.chunkers import ChunkerFactory
+    from common.error_codes import ErrorCode
+    
+    strategies = ChunkerFactory.get_available_strategies()
+    
+    return {
+        "code": ErrorCode.SUCCESS.code,
+        "message": ErrorCode.SUCCESS.message,
+        "data": {
+            "strategies": strategies,
+            "defaults": {
+                "chunking_strategy": ChunkerFactory.DEFAULT_STRATEGY,
+                "chunk_size": ChunkerFactory.DEFAULT_CHUNK_SIZE,
+                "chunk_overlap": ChunkerFactory.DEFAULT_CHUNK_OVERLAP
+            }
+        }
+    }
+
 # 文档管理API - 保持 /llm 前缀
 api.add_resource(SimpleKnowledgeController, '/llm/documents', endpoint='documents')
 api.add_resource(SimpleKnowledgeController, '/llm/documents/<string:document_id>', endpoint='document_detail', methods=['GET', 'DELETE', 'PUT'])
