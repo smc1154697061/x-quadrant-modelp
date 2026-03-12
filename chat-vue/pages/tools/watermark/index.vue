@@ -21,7 +21,7 @@
         
         <!-- 文件上传区域 -->
         <view class="upload-card">
-          <text class="card-title">选择文件</text>
+          <text class="card-title">选择图片</text>
           <view class="upload-zone" @tap="selectFile">
             <view v-if="!originalFile" class="upload-empty">
               <text class="upload-icon">📁</text>
@@ -60,7 +60,7 @@
 <script>
 import WatermarkEditor from './WatermarkEditor.vue';
 import WatermarkPreview from './WatermarkPreview.vue';
-import { getPlatformType, platformUtils } from '../../../utils/platform-adapter.js';
+import { platformUtils } from '../../../utils/platform-adapter.js';
 
 export default {
   components: {
@@ -102,8 +102,6 @@ export default {
     },
     
     selectFile() {
-      const platform = getPlatformType();
-      
       uni.chooseImage({
         count: 1,
         sizeType: ['original', 'compressed'],
@@ -123,7 +121,7 @@ export default {
         fail: (err) => {
           if (!err.errMsg?.includes('cancel')) {
             uni.showToast({
-              title: '选择文件失败',
+              title: '选择图片失败',
               icon: 'none'
             });
           }

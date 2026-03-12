@@ -6,19 +6,20 @@
     </view>
     
     <view class="preview-container">
-      <!-- 使用条件渲染确保 Canvas 在尺寸确定后才创建 -->
-      <canvas 
-        v-if="originalFile && canvasReady"
-        :canvas-id="canvasId"
-        class="preview-canvas"
-        :style="{ width: canvasWidth + 'px', height: canvasHeight + 'px' }"
-      />
+      <!-- Canvas实际尺寸保持原图比例，通过CSS缩放显示 -->
+      <view v-if="originalFile && canvasReady" class="canvas-wrapper" :style="{ width: displayWidth + 'px', height: displayHeight + 'px' }">
+        <canvas 
+          :canvas-id="canvasId"
+          class="preview-canvas"
+          :style="{ width: canvasWidth + 'px', height: canvasHeight + 'px', transform: 'scale(' + (displayWidth / canvasWidth) + ')', transformOrigin: 'top left' }"
+        />
+      </view>
       <view v-else-if="originalFile && !canvasReady" class="loading-preview">
         <text class="loading-text">加载中...</text>
       </view>
       <view v-else class="empty-preview">
         <text class="empty-icon">🖼️</text>
-        <text class="empty-text">请先上传图片或PDF</text>
+        <text class="empty-text">请先上传图片</text>
       </view>
     </view>
     
@@ -57,11 +58,14 @@ export default {
       canvasId: 'watermarkCanvas',
       canvasWidth: 300,
       canvasHeight: 300,
+      displayWidth: 300,
+      displayHeight: 300,
       isProcessing: false,
       platform: '',
       imageInfo: null,
       canvasReady: false,
-      drawTimeout: null
+      drawTimeout: null,
+      containerWidth: 0
     };
   },
   
@@ -88,6 +92,7 @@ export default {
   
   mounted() {
     this.platform = getPlatformType();
+    this.getContainerWidth();
   },
   
   beforeDestroy() {
@@ -97,8 +102,48 @@ export default {
   },
   
   methods: {
+    getContainerWidth() {
+      // 获取容器实际宽度用于计算显示尺寸
+      const query = uni.createSelectorQuery().in(this);
+      query.select('.preview-container').boundingClientRect(rect => {
+        if (rect) {
+          // 减去padding
+          this.containerWidth = rect.width - 40;
+        } else {
+          this.containerWidth = 300;
+        }
+      }).exec();
+    },
+    
+    calculateDisplaySize(originalWidth, originalHeight) {
+      // 计算在容器内的显示尺寸，保持宽高比
+      const maxDisplayWidth = this.containerWidth || 300;
+      const maxDisplayHeight = 500;
+      
+      const ratio = originalWidth / originalHeight;
+      let displayWidth = originalWidth;
+      let displayHeight = originalHeight;
+      
+      // 如果宽度超出容器，按宽度缩放
+      if (displayWidth > maxDisplayWidth) {
+        displayWidth = maxDisplayWidth;
+        displayHeight = displayWidth / ratio;
+      }
+      
+      // 如果高度还是超出，按高度缩放
+      if (displayHeight > maxDisplayHeight) {
+        displayHeight = maxDisplayHeight;
+        displayWidth = displayHeight * ratio;
+      }
+      
+      return { displayWidth, displayHeight };
+    },
+    
     loadImageInfo() {
       if (!this.originalFile || !this.originalFile.path) return;
+      
+      // 先获取容器宽度
+      this.getContainerWidth();
       
       uni.getImageInfo({
         src: this.originalFile.path,
@@ -124,16 +169,23 @@ export default {
           this.canvasWidth = targetWidth;
           this.canvasHeight = targetHeight;
           
-          // 先让 Canvas 创建出来
-          this.$nextTick(() => {
-            this.canvasReady = true;
-            // Canvas 创建后再绘制
+          // 计算显示尺寸
+          setTimeout(() => {
+            const { displayWidth, displayHeight } = this.calculateDisplaySize(targetWidth, targetHeight);
+            this.displayWidth = displayWidth;
+            this.displayHeight = displayHeight;
+            
+            // 先让 Canvas 创建出来
             this.$nextTick(() => {
-              setTimeout(() => {
-                this.drawWatermark();
-              }, 50);
+              this.canvasReady = true;
+              // Canvas 创建后再绘制
+              this.$nextTick(() => {
+                setTimeout(() => {
+                  this.drawWatermark();
+                }, 50);
+              });
             });
-          });
+          }, 100);
         },
         fail: (err) => {
           console.error('[水印预览] 获取图片信息失败:', err);
@@ -485,10 +537,16 @@ export default {
   padding: 20rpx;
 }
 
-.preview-canvas {
-  display: block;
+.canvas-wrapper {
+  position: relative;
+  overflow: hidden;
   border-radius: 8rpx;
   box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.1);
+  flex-shrink: 0;
+}
+
+.preview-canvas {
+  display: block;
 }
 
 .loading-preview {

@@ -45,7 +45,7 @@
         />
       </view>
       
-      <view class="config-row">
+      <view class="config-row color-row">
         <text class="config-label">文字颜色</text>
         <view class="color-picker">
           <view 
@@ -56,14 +56,66 @@
             :class="{ active: textConfig.color === color }"
             @tap="setTextColor(color)"
           />
+          <view class="color-custom" @tap="openColorPanel">
+            <view class="color-custom-preview" :style="{ backgroundColor: textConfig.color }"></view>
+            <text class="color-custom-icon">▼</text>
+          </view>
+        </view>
+      </view>
+      
+      <!-- 颜色选择器面板 -->
+      <view v-if="showColorPanel" class="color-panel">
+        <view class="panel-header">
+          <text class="panel-title">自定义颜色</text>
+          <text class="panel-close" @tap="closeColorPanel">×</text>
+        </view>
+        
+        <!-- 色相选择器 -->
+        <view class="hue-picker">
+          <view class="hue-bar" @tap="onHueBarTap">
+            <view class="hue-thumb" :style="{ left: (hslColor.h / 360 * 100) + '%' }"></view>
+          </view>
+        </view>
+        
+        <!-- 饱和度/明度选择器 -->
+        <view class="saturation-lightness-picker" @tap="onSLPickerTap">
+          <view 
+            class="sl-area" 
+            :style="{ background: 'linear-gradient(to right, #fff, hsl(' + hslColor.h + ', 100%, 50%))' }"
+          >
+            <view class="sl-overlay"></view>
+            <view 
+              class="sl-thumb" 
+              :style="{ left: hslColor.s + '%', top: (100 - hslColor.l) + '%' }"
+            ></view>
+          </view>
+        </view>
+        
+        <!-- 颜色预览和输入 -->
+        <view class="color-result">
+          <view class="color-preview-large" :style="{ backgroundColor: textConfig.color }"></view>
           <input 
             v-model="textConfig.color"
-            class="color-input"
+            class="color-hex-input"
             type="text"
             placeholder="#000000"
             maxlength="7"
+            @input="onHexInput"
           />
         </view>
+        
+        <!-- 常用颜色快捷选择 -->
+        <view class="quick-colors">
+          <view 
+            v-for="color in quickColors" 
+            :key="color"
+            class="quick-color-item"
+            :style="{ backgroundColor: color }"
+            @tap="setTextColor(color); closeColorPanel()"
+          />
+        </view>
+        
+        <button class="confirm-btn" @tap="closeColorPanel">确定</button>
       </view>
     </view>
 
@@ -192,7 +244,6 @@
 </template>
 
 <script>
-import { getPlatformType, PLATFORM_TYPE } from '../../../utils/platform-adapter.js';
 
 export default {
   name: 'WatermarkEditor',
@@ -230,9 +281,13 @@ export default {
       tileGap: 50,
       presetColors: [
         '#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF',
-        '#808080', '#C0C0C0', '#800000', '#808000', '#008000', '#800080', '#008080', '#000080',
-        '#FFA500', '#FFC0CB', '#FFD700', '#A52A2A', '#FA8072', '#E6E6FA', '#F0E68C', '#DDA0DD',
-        '#87CEEB', '#98FB98', '#F5DEB3', '#FFE4E1', '#F0F8FF', '#1E90FF', '#FF6347', '#40E0D0'
+        '#808080', '#C0C0C0', '#800000', '#808000', '#008000', '#800080', '#008080', '#000080'
+      ],
+      showColorPanel: false,
+      hslColor: { h: 0, s: 50, l: 50 },
+      quickColors: [
+        '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F',
+        '#BB8FCE', '#85C1E9', '#F8B500', '#00CED1', '#FF69B4', '#32CD32', '#FF8C00', '#9370DB'
       ]
     };
   },
@@ -285,6 +340,101 @@ export default {
     
     setTextColor(color) {
       this.textConfig.color = color;
+      this.updateHslFromHex(color);
+    },
+    
+    openColorPanel() {
+      this.updateHslFromHex(this.textConfig.color);
+      this.showColorPanel = true;
+    },
+    
+    closeColorPanel() {
+      this.showColorPanel = false;
+    },
+    
+    updateHslFromHex(hex) {
+      const rgb = this.hexToRgb(hex);
+      if (rgb) {
+        const hsl = this.rgbToHsl(rgb.r, rgb.g, rgb.b);
+        this.hslColor = hsl;
+      }
+    },
+    
+    hexToRgb(hex) {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+      } : null;
+    },
+    
+    rgbToHsl(r, g, b) {
+      r /= 255; g /= 255; b /= 255;
+      const max = Math.max(r, g, b), min = Math.min(r, g, b);
+      let h, s, l = (max + min) / 2;
+      
+      if (max === min) {
+        h = s = 0;
+      } else {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch (max) {
+          case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+          case g: h = ((b - r) / d + 2) / 6; break;
+          case b: h = ((r - g) / d + 4) / 6; break;
+        }
+      }
+      return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
+    },
+    
+    hslToHex(h, s, l) {
+      s /= 100; l /= 100;
+      const a = s * Math.min(l, 1 - l);
+      const f = n => {
+        const k = (n + h / 30) % 12;
+        const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+        return Math.round(255 * color).toString(16).padStart(2, '0');
+      };
+      return `#${f(0)}${f(8)}${f(4)}`.toUpperCase();
+    },
+    
+    onHueBarTap(e) {
+      const rect = e.currentTarget;
+      const touch = e.detail || e.touches?.[0] || e;
+      // 使用相对位置计算
+      const query = uni.createSelectorQuery().in(this);
+      query.select('.hue-bar').boundingClientRect(data => {
+        if (data) {
+          const x = (touch.x !== undefined ? touch.x : touch.clientX) - data.left;
+          const percent = Math.max(0, Math.min(1, x / data.width));
+          this.hslColor.h = Math.round(percent * 360);
+          this.textConfig.color = this.hslToHex(this.hslColor.h, this.hslColor.s, this.hslColor.l);
+        }
+      }).exec();
+    },
+    
+    onSLPickerTap(e) {
+      const touch = e.detail || e.touches?.[0] || e;
+      const query = uni.createSelectorQuery().in(this);
+      query.select('.sl-area').boundingClientRect(data => {
+        if (data) {
+          const x = (touch.x !== undefined ? touch.x : touch.clientX) - data.left;
+          const y = (touch.y !== undefined ? touch.y : touch.clientY) - data.top;
+          const s = Math.max(0, Math.min(100, (x / data.width) * 100));
+          const l = Math.max(0, Math.min(100, 100 - (y / data.height) * 100));
+          this.hslColor.s = Math.round(s);
+          this.hslColor.l = Math.round(l);
+          this.textConfig.color = this.hslToHex(this.hslColor.h, this.hslColor.s, this.hslColor.l);
+        }
+      }).exec();
+    },
+    
+    onHexInput(e) {
+      const value = e.detail?.value || e.target?.value || '';
+      if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
+        this.updateHslFromHex(value);
+      }
     },
     
     onFontSizeChange(e) {
@@ -324,8 +474,6 @@ export default {
     },
     
     selectWatermarkImage() {
-      const platform = getPlatformType();
-      
       uni.chooseImage({
         count: 1,
         sizeType: ['original', 'compressed'],
@@ -476,14 +624,188 @@ export default {
   transform: scale(1.1);
 }
 
-.color-input {
-  width: 140rpx;
+.color-custom {
+  width: 56rpx;
   height: 56rpx;
+  border-radius: 8rpx;
+  border: 2rpx solid #ddd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.color-custom-preview {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.color-custom-icon {
+  font-size: 16rpx;
+  color: #fff;
+  text-shadow: 0 0 2rpx #000;
+  position: relative;
+  z-index: 1;
+}
+
+/* 颜色选择面板 */
+.color-panel {
+  margin-top: 20rpx;
+  background: #f9f9f9;
+  border-radius: 12rpx;
+  padding: 20rpx;
+  border: 2rpx solid #eee;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.panel-title {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #333;
+}
+
+.panel-close {
+  font-size: 40rpx;
+  color: #999;
+  line-height: 1;
+  padding: 0 10rpx;
+}
+
+/* 色相选择器 */
+.hue-picker {
+  margin-bottom: 20rpx;
+}
+
+.hue-bar {
+  height: 24rpx;
+  border-radius: 12rpx;
+  background: linear-gradient(to right, 
+    hsl(0, 100%, 50%), 
+    hsl(60, 100%, 50%), 
+    hsl(120, 100%, 50%), 
+    hsl(180, 100%, 50%), 
+    hsl(240, 100%, 50%), 
+    hsl(300, 100%, 50%), 
+    hsl(360, 100%, 50%)
+  );
+  position: relative;
+  cursor: pointer;
+}
+
+.hue-thumb {
+  width: 24rpx;
+  height: 24rpx;
+  background: #fff;
+  border: 4rpx solid #333;
+  border-radius: 50%;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.3);
+}
+
+/* 饱和度/明度选择器 */
+.saturation-lightness-picker {
+  margin-bottom: 20rpx;
+}
+
+.sl-area {
+  width: 100%;
+  height: 200rpx;
+  border-radius: 8rpx;
+  position: relative;
+  cursor: pointer;
+}
+
+.sl-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(to bottom, transparent 0%, #000 100%);
+  border-radius: 8rpx;
+}
+
+.sl-thumb {
+  width: 20rpx;
+  height: 20rpx;
+  background: #fff;
+  border: 4rpx solid #333;
+  border-radius: 50%;
+  position: absolute;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.3);
+  pointer-events: none;
+}
+
+/* 颜色结果 */
+.color-result {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-bottom: 20rpx;
+}
+
+.color-preview-large {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 8rpx;
+  border: 2rpx solid #ddd;
+  flex-shrink: 0;
+}
+
+.color-hex-input {
+  flex: 1;
+  height: 80rpx;
   border: 2rpx solid #eee;
   border-radius: 8rpx;
-  padding: 0 12rpx;
-  font-size: 24rpx;
+  padding: 0 20rpx;
+  font-size: 28rpx;
   font-family: monospace;
+  text-transform: uppercase;
+  background: #fff;
+}
+
+/* 快捷颜色 */
+.quick-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-bottom: 20rpx;
+}
+
+.quick-color-item {
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 8rpx;
+  border: 2rpx solid #fff;
+  box-shadow: 0 0 0 1rpx #ddd;
+}
+
+.confirm-btn {
+  width: 100%;
+  height: 72rpx;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  border: none;
+  border-radius: 36rpx;
+  font-size: 28rpx;
+  font-weight: 500;
+}
+
+.color-row {
+  flex-wrap: wrap;
 }
 
 /* 图片上传 */
