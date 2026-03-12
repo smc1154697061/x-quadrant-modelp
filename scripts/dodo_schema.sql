@@ -176,5 +176,66 @@ CREATE INDEX "idx_dodo_kb_documents_kb_id" ON "public"."dodo_kb_documents" ("kb_
 CREATE INDEX "idx_dodo_kb_documents_document_id" ON "public"."dodo_kb_documents" ("document_id");
 
 -- ====================================================================
+-- 智能模板文档生成工具相关表
+-- ====================================================================
+
+-- 删除旧表（按依赖顺序）
+DROP TABLE IF EXISTS "public"."dodo_template_generations" CASCADE;
+DROP TABLE IF EXISTS "public"."dodo_document_templates" CASCADE;
+
+-- 删除序列
+DROP SEQUENCE IF EXISTS "public"."dodo_document_templates_id_seq" CASCADE;
+DROP SEQUENCE IF EXISTS "public"."dodo_template_generations_id_seq" CASCADE;
+
+-- 创建序列
+CREATE SEQUENCE "public"."dodo_document_templates_id_seq" INCREMENT 1 MINVALUE 1 MAXVALUE 2147483647 START 1 CACHE 1;
+CREATE SEQUENCE "public"."dodo_template_generations_id_seq" INCREMENT 1 MINVALUE 1 MAXVALUE 2147483647 START 1 CACHE 1;
+
+-- 文档模板表
+CREATE TABLE "public"."dodo_document_templates" (
+    "id" int4 NOT NULL DEFAULT nextval('dodo_document_templates_id_seq'::regclass),
+    "name" varchar(255) NOT NULL,
+    "tags" varchar(255),
+    "file_type" varchar(50) NOT NULL,
+    "file_size" int4,
+    "minio_path" varchar(500) NOT NULL,
+    "created_by" int4 NOT NULL,
+    "created_at" timestamptz(6) DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY ("id"),
+    FOREIGN KEY ("created_by") REFERENCES "public"."dodo_users" ("id") ON DELETE NO ACTION
+);
+CREATE INDEX "idx_dodo_document_templates_created_by" ON "public"."dodo_document_templates" ("created_by");
+CREATE INDEX "idx_dodo_document_templates_tags" ON "public"."dodo_document_templates" ("tags");
+COMMENT ON TABLE "public"."dodo_document_templates" IS '文档模板表';
+COMMENT ON COLUMN "public"."dodo_document_templates"."name" IS '模板名称';
+COMMENT ON COLUMN "public"."dodo_document_templates"."tags" IS '模板标签，多个标签用逗号分隔';
+COMMENT ON COLUMN "public"."dodo_document_templates"."file_type" IS '文件类型：word/pdf';
+COMMENT ON COLUMN "public"."dodo_document_templates"."minio_path" IS 'MinIO存储路径';
+
+-- 模板文档生成记录表
+CREATE TABLE "public"."dodo_template_generations" (
+    "id" int4 NOT NULL DEFAULT nextval('dodo_template_generations_id_seq'::regclass),
+    "template_id" int4 NOT NULL,
+    "user_id" int4 NOT NULL,
+    "user_input" text NOT NULL,
+    "generated_content" text,
+    "output_file_path" varchar(500),
+    "output_file_type" varchar(50),
+    "status" varchar(20) DEFAULT 'pending',
+    "created_at" timestamptz(6) DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY ("id"),
+    FOREIGN KEY ("template_id") REFERENCES "public"."dodo_document_templates" ("id") ON DELETE CASCADE,
+    FOREIGN KEY ("user_id") REFERENCES "public"."dodo_users" ("id") ON DELETE NO ACTION
+);
+CREATE INDEX "idx_dodo_template_generations_template_id" ON "public"."dodo_template_generations" ("template_id");
+CREATE INDEX "idx_dodo_template_generations_user_id" ON "public"."dodo_template_generations" ("user_id");
+CREATE INDEX "idx_dodo_template_generations_status" ON "public"."dodo_template_generations" ("status");
+COMMENT ON TABLE "public"."dodo_template_generations" IS '模板文档生成记录表';
+COMMENT ON COLUMN "public"."dodo_template_generations"."user_input" IS '用户输入的个人信息';
+COMMENT ON COLUMN "public"."dodo_template_generations"."generated_content" IS 'AI生成的文档内容';
+COMMENT ON COLUMN "public"."dodo_template_generations"."output_file_path" IS '生成的文档文件路径';
+COMMENT ON COLUMN "public"."dodo_template_generations"."status" IS '状态：pending/generating/completed/failed';
+
+-- ====================================================================
 -- 完成！
 -- ====================================================================
