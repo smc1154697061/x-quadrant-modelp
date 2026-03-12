@@ -60,6 +60,13 @@
 			}
 		},
 		{
+			"path": "pages/tools/watermark/index",
+			"style": {
+				"navigationBarTitleText": "文档水印",
+				"navigationStyle": "custom"
+			}
+		},
+		{
 			"path": "pages/tools/template-manage/index",
 			"style": {
 				"navigationBarTitleText": "模板管理",
