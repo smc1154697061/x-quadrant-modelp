@@ -8,6 +8,7 @@ from app.controllers.extraction_controller import ExtractionController
 from app.controllers.knowledge_controller import SimpleKnowledgeController, KnowledgeBaseController, KnowledgeBaseFilesController, KnowledgeBaseBasicController
 from app.controllers.auth_controller import AuthCodeResource, AuthLoginRegisterResource, AuthVerifyTokenResource
 from app.controllers.file_controller import FileController
+from app.controllers.template_controller import TemplateController, TemplateCategoryController, DocumentGenerateController, GeneratedDocumentController
 from app.services.chat_service import ChatService
 from app.services.bot_service import BotService
 from common import log_
@@ -65,6 +66,14 @@ api.add_resource(ChatController, '/llm/chat', endpoint='unsaved_chat', methods=[
 
 # 文件预览和下载API
 api.add_resource(FileController, '/llm/files/<int:document_id>', endpoint='file_preview', methods=['GET'])
+
+# 模板文档API
+api.add_resource(TemplateController, '/llm/templates', endpoint='templates')
+api.add_resource(TemplateController, '/llm/templates/<int:template_id>', endpoint='template_detail')
+api.add_resource(TemplateCategoryController, '/llm/templates/categories', endpoint='template_categories')
+api.add_resource(DocumentGenerateController, '/llm/documents/generate', endpoint='document_generate')
+api.add_resource(GeneratedDocumentController, '/llm/documents/generated', endpoint='generated_documents')
+api.add_resource(GeneratedDocumentController, '/llm/documents/generated/<int:doc_id>', endpoint='generated_document_detail')
 
 # 流式聊天API - 使用蓝图直接注册以避免RESTful的JSON序列化
 stream_chat_service = ChatService()

@@ -13,9 +13,19 @@
           <view class="tool-arrow">›</view>
         </view>
         
+        <!-- 智能模板文档生成工具 -->
+        <view class="tool-card" @tap="navigateToTool('template-manage')">
+          <view class="tool-icon">�</view>
+          <view class="tool-info">
+            <text class="tool-name">模板文档生成</text>
+            <text class="tool-desc">上传模板，AI自动生成个性化文档</text>
+          </view>
+          <view class="tool-arrow">›</view>
+        </view>
+        
         <!-- 占位卡片 - 未来功能 -->
         <view class="tool-card disabled">
-          <view class="tool-icon">🔄</view>
+          <view class="tool-icon">�</view>
           <view class="tool-info">
             <text class="tool-name">JSON转换</text>
             <text class="tool-desc">敬请期待</text>
@@ -23,17 +33,9 @@
         </view>
         
         <view class="tool-card disabled">
-          <view class="tool-icon">📅</view>
+          <view class="tool-icon">�</view>
           <view class="tool-info">
             <text class="tool-name">日期转换</text>
-            <text class="tool-desc">敬请期待</text>
-          </view>
-        </view>
-        
-        <view class="tool-card disabled">
-          <view class="tool-icon">🔢</view>
-          <view class="tool-info">
-            <text class="tool-name">进制转换</text>
             <text class="tool-desc">敬请期待</text>
           </view>
         </view>
