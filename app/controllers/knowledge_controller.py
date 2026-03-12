@@ -111,6 +111,31 @@ class KnowledgeBaseController(BaseResource):
                 "message": f"删除知识库失败: {str(e)}",
                 "data": None
             }, 500
+    
+    @api_exception_handler
+    @login_required
+    def put(self, kb_id=None):
+        """更新知识库"""
+        if not kb_id:
+            return {
+                "code": ErrorCode.VALIDATION_ERROR.code,
+                "message": "缺少知识库ID",
+                "data": None
+            }, 400
+        
+        from app.entity.dto.knowledge_dto import KnowledgeBaseUpdateDTO
+        
+        data = self.get_params()
+        dto = KnowledgeBaseUpdateDTO.from_request(data)
+        dto.validate()
+        
+        kb = self.knowledge_service.update_knowledge_base(kb_id, dto)
+        
+        return {
+            "code": ErrorCode.SUCCESS.code,
+            "message": "知识库更新成功",
+            "data": kb
+        }, 200
 
     @api_exception_handler
     @login_optional

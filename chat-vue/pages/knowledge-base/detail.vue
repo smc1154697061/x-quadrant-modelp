@@ -18,6 +18,25 @@
             <template v-else>
               <text class="kb-name">{{ knowledgeBase.name }}</text>
               <text class="kb-description">{{ knowledgeBase.description || '无描述' }}</text>
+              
+              <!-- 分块配置信息 -->
+              <view class="chunk-config-info">
+                <view class="chunk-config-title">分块配置</view>
+                <view class="chunk-config-items">
+                  <view class="chunk-config-item">
+                    <text class="config-label">策略:</text>
+                    <text class="config-value">{{ formatChunkingStrategy(knowledgeBase.chunking_strategy) }}</text>
+                  </view>
+                  <view class="chunk-config-item" v-if="knowledgeBase.chunking_strategy === 'fixed'">
+                    <text class="config-label">大小:</text>
+                    <text class="config-value">{{ knowledgeBase.chunk_size }}</text>
+                  </view>
+                  <view class="chunk-config-item" v-if="knowledgeBase.chunking_strategy === 'fixed'">
+                    <text class="config-label">重叠:</text>
+                    <text class="config-value">{{ knowledgeBase.chunk_overlap }}</text>
+                  </view>
+                </view>
+              </view>
             </template>
           </view>
           
@@ -725,6 +744,16 @@ export default {
       const sizes = ['Bytes', 'KB', 'MB', 'GB'];
       const i = Math.floor(Math.log(bytes) / Math.log(k));
       return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    },
+    
+    // 格式化分块策略
+    formatChunkingStrategy(strategy) {
+      const strategies = {
+        'fixed': '固定长度',
+        'semantic': '语义分块',
+        'sentence': '句子分块'
+      };
+      return strategies[strategy] || strategy;
     },
     
     // 返回列表页
@@ -1518,5 +1547,44 @@ button {
   text-overflow: ellipsis;
   white-space: nowrap;
   display: block;
+}
+
+/* 分块配置信息样式 */
+.chunk-config-info {
+  margin-top: 15px;
+  padding: 12px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border-left: 3px solid var(--primary-color, #007AFF);
+}
+
+.chunk-config-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.chunk-config-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.chunk-config-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.config-label {
+  font-size: 12px;
+  color: #999;
+}
+
+.config-value {
+  font-size: 12px;
+  color: #333;
+  font-weight: 500;
 }
 </style> 

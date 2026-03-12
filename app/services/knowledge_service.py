@@ -114,16 +114,17 @@ class KnowledgeService:
             知识库字典
         """
         try:
-            # 创建知识库实体对象
             from app.entity.knowledge_base import KnowledgeBase
             kb = KnowledgeBase(
                 name=dto.name,
                 description=dto.description,
                 created_by=user_id,
-                is_public=False
+                is_public=False,
+                chunking_strategy=dto.chunking_strategy,
+                chunk_size=dto.chunk_size,
+                chunk_overlap=dto.chunk_overlap
             )
             
-            # 调用DAO创建
             kb_dict = KnowledgeBaseDAO().create(kb)
             
             return kb_dict
@@ -250,6 +251,37 @@ class KnowledgeService:
         except Exception as e:
             log_.error(f"删除知识库失败: {str(e)}")
             raise APIException(ErrorCode.SYSTEM_ERROR, msg=f"删除知识库失败: {str(e)}")
+    
+    def update_knowledge_base(self, kb_id, dto):
+        """更新知识库
+        
+        参数:
+            kb_id: 知识库ID
+            dto: KnowledgeBaseUpdateDTO对象
+        
+        返回:
+            知识库字典
+        """
+        try:
+            update_data = {}
+            if dto.name is not None:
+                update_data['name'] = dto.name
+            if dto.description is not None:
+                update_data['description'] = dto.description
+            if dto.chunking_strategy is not None:
+                update_data['chunking_strategy'] = dto.chunking_strategy
+            if dto.chunk_size is not None:
+                update_data['chunk_size'] = dto.chunk_size
+            if dto.chunk_overlap is not None:
+                update_data['chunk_overlap'] = dto.chunk_overlap
+            
+            if update_data:
+                KnowledgeBaseDAO().update(kb_id, update_data)
+            
+            return KnowledgeBaseDAO().find_by_id(kb_id)
+        except Exception as e:
+            log_.error(f"更新知识库失败: {str(e)}")
+            raise APIException(ErrorCode.SYSTEM_ERROR, msg=f"更新知识库失败: {str(e)}")
     
     def add_file_to_knowledge_base(self, kb_id, file):
         """向知识库添加文件，但不进行向量化处理"""
@@ -562,6 +594,21 @@ class KnowledgeService:
                 log_.error(f"文档不存在: {document_id}")
                 return
             
+            # 获取文档所属知识库的分块配置
+            from app.dao.kb_document_dao import KBDocumentDAO
+            kb_ids = KBDocumentDAO().get_document_kbs(document_id)
+            chunking_strategy = 'fixed'
+            chunk_size = 1000
+            chunk_overlap = 200
+            
+            if kb_ids:
+                kb = KnowledgeBaseDAO().find_by_id(kb_ids[0])
+                if kb:
+                    chunking_strategy = kb.get('chunking_strategy', 'fixed')
+                    chunk_size = kb.get('chunk_size', 1000)
+                    chunk_overlap = kb.get('chunk_overlap', 200)
+                    log_.info(f"使用知识库 {kb_ids[0]} 的分块配置: strategy={chunking_strategy}, size={chunk_size}, overlap={chunk_overlap}")
+            
             # 检查PostgreSQL向量扩展
             try:
                 with get_db_connection() as conn:
@@ -626,9 +673,16 @@ class KnowledgeService:
                 DocumentDAO().update_status(document_id, "failed")
                 return
             
-            # 分割文档
+            # 分割文档 - 使用知识库的分块配置
             try:
-                chunks = split_document(doc)
+                from app.utils.document_loader import split_document_with_strategy
+                chunks = split_document_with_strategy(
+                    docs=doc,
+                    strategy=chunking_strategy,
+                    chunk_size=chunk_size,
+                    chunk_overlap=chunk_overlap,
+                    embeddings_model=self.embeddings_model if hasattr(self, 'embeddings_model') else None
+                )
 
                 # 限制分块数量，防止资源过度占用
                 max_chunks = 1000

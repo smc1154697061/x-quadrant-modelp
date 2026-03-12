@@ -67,6 +67,45 @@
             </view>
           </view>
           
+          <view class="form-item">
+            <text class="form-label">分块策略</text>
+            <view class="strategy-options">
+              <view 
+                v-for="strategy in chunkingStrategies" 
+                :key="strategy.value"
+                class="strategy-option"
+                :class="{ active: newKB.chunking_strategy === strategy.value }"
+                @tap="newKB.chunking_strategy = strategy.value"
+              >
+                <text>{{ strategy.label }}</text>
+              </view>
+            </view>
+          </view>
+          
+          <view class="form-item" v-if="newKB.chunking_strategy === 'fixed'">
+            <text class="form-label">分块大小: {{ newKB.chunk_size }}</text>
+            <slider 
+              :value="newKB.chunk_size" 
+              min="100" 
+              max="5000" 
+              step="100"
+              @change="onChunkSizeChange"
+              show-value
+            />
+          </view>
+          
+          <view class="form-item" v-if="newKB.chunking_strategy === 'fixed'">
+            <text class="form-label">分块重叠: {{ newKB.chunk_overlap }}</text>
+            <slider 
+              :value="newKB.chunk_overlap" 
+              min="0" 
+              max="1000" 
+              step="50"
+              @change="onChunkOverlapChange"
+              show-value
+            />
+          </view>
+          
           <view class="dialog-buttons">
             <button class="cancel-btn" @tap="cancelCreateKB" :disabled="creating">取消</button>
             <button class="confirm-btn" @tap="confirmCreateKB" :disabled="!newKB.name || creating">
@@ -110,6 +149,45 @@
             </view>
           </view>
           
+          <view class="form-item">
+            <text class="form-label">分块策略</text>
+            <view class="strategy-options">
+              <view 
+                v-for="strategy in chunkingStrategies" 
+                :key="strategy.value"
+                class="strategy-option"
+                :class="{ active: newKBStrategy === strategy.value }"
+                @tap="newKBStrategy = strategy.value"
+              >
+                <text>{{ strategy.label }}</text>
+              </view>
+            </view>
+          </view>
+          
+          <view class="form-item" v-if="newKBStrategy === 'fixed'">
+            <text class="form-label">分块大小: {{ newKBChunkSize }}</text>
+            <slider 
+              :value="newKBChunkSize" 
+              min="100" 
+              max="5000" 
+              step="100"
+              @change="onRenameChunkSizeChange"
+              show-value
+            />
+          </view>
+          
+          <view class="form-item" v-if="newKBStrategy === 'fixed'">
+            <text class="form-label">分块重叠: {{ newKBChunkOverlap }}</text>
+            <slider 
+              :value="newKBChunkOverlap" 
+              min="0" 
+              max="1000" 
+              step="50"
+              @change="onRenameChunkOverlapChange"
+              show-value
+            />
+          </view>
+          
           <view class="dialog-buttons">
             <button class="cancel-btn" @tap="cancelRenameKB">取消</button>
             <button class="confirm-btn" @tap="confirmRenameKB" :disabled="!newKBName">保存</button>
@@ -150,16 +228,29 @@ export default {
       creating: false,
       newKB: {
         name: '',
-        description: ''
+        description: '',
+        chunking_strategy: 'fixed',
+        chunk_size: 1000,
+        chunk_overlap: 200
       },
       isNameFocused: false,
       isDescFocused: false,
+      
+      // 分块策略选项
+      chunkingStrategies: [
+        { value: 'fixed', label: '固定长度' },
+        { value: 'semantic', label: '语义分块' },
+        { value: 'sentence', label: '句子分块' }
+      ],
       
       // 重命名知识库相关
       showRenameKB: false,
       renameKBId: null,
       newKBName: '',
       newKBDesc: '',
+      newKBStrategy: 'fixed',
+      newKBChunkSize: 1000,
+      newKBChunkOverlap: 200,
       isRenameNameFocused: false,
       isRenameDescFocused: false,
       
@@ -334,7 +425,10 @@ export default {
       
       this.newKB = {
         name: '',
-        description: ''
+        description: '',
+        chunking_strategy: 'fixed',
+        chunk_size: 1000,
+        chunk_overlap: 200
       };
       this.showCreateKB = true;
     },
@@ -342,6 +436,16 @@ export default {
     // 取消创建知识库
     cancelCreateKB() {
       this.showCreateKB = false;
+    },
+    
+    // 分块大小滑块变化
+    onChunkSizeChange(e) {
+      this.newKB.chunk_size = e.detail.value;
+    },
+    
+    // 分块重叠滑块变化
+    onChunkOverlapChange(e) {
+      this.newKB.chunk_overlap = e.detail.value;
     },
     
     // 确认创建知识库
@@ -372,7 +476,10 @@ export default {
         // 构建请求数据
         const requestData = {
           name: this.newKB.name,
-          description: this.newKB.description || ''
+          description: this.newKB.description || '',
+          chunking_strategy: this.newKB.chunking_strategy,
+          chunk_size: this.newKB.chunk_size,
+          chunk_overlap: this.newKB.chunk_overlap
         };
         
         // 实际API调用
@@ -433,6 +540,9 @@ export default {
       this.renameKBId = kb.id;
       this.newKBName = kb.name;
       this.newKBDesc = kb.description || '';
+      this.newKBStrategy = kb.chunking_strategy || 'fixed';
+      this.newKBChunkSize = kb.chunk_size || 1000;
+      this.newKBChunkOverlap = kb.chunk_overlap || 200;
       this.showRenameKB = true;
     },
     
@@ -440,6 +550,16 @@ export default {
     cancelRenameKB() {
       this.showRenameKB = false;
       this.renameKBId = null;
+    },
+    
+    // 重命名弹窗分块大小滑块变化
+    onRenameChunkSizeChange(e) {
+      this.newKBChunkSize = e.detail.value;
+    },
+    
+    // 重命名弹窗分块重叠滑块变化
+    onRenameChunkOverlapChange(e) {
+      this.newKBChunkOverlap = e.detail.value;
     },
     
     // 确认重命名知识库
@@ -468,7 +588,10 @@ export default {
         // 实际API调用
         const result = await api.put(`/llm/knowledge-bases/${this.renameKBId}`, {
           name: this.newKBName,
-          description: this.newKBDesc || ''
+          description: this.newKBDesc || '',
+          chunking_strategy: this.newKBStrategy,
+          chunk_size: this.newKBChunkSize,
+          chunk_overlap: this.newKBChunkOverlap
         });
         
         if (result && (result.code === '0000')) {
@@ -1072,5 +1195,32 @@ page .basic-input, page .basic-textarea {
 .input-wrapper.focus-within textarea {
   border-color: var(--primary-color, #007AFF) !important;
   box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.1) !important;
+}
+
+/* 分块策略选项样式 */
+.strategy-options {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.strategy-option {
+  flex: 1;
+  padding: 10px;
+  text-align: center;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background-color: #f8f9fa;
+  transition: all 0.2s;
+}
+
+.strategy-option.active {
+  border-color: var(--primary-color, #007AFF);
+  background-color: rgba(0, 122, 255, 0.1);
+  color: var(--primary-color, #007AFF);
+}
+
+.strategy-option text {
+  font-size: 14px;
 }
 </style> 

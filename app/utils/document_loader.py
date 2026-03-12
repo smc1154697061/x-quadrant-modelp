@@ -2,7 +2,7 @@
 文档加载和处理工具
 """
 import os
-from typing import List
+from typing import List, Optional
 import tempfile
 
 from langchain_community.document_loaders import (
@@ -88,7 +88,7 @@ def load_document(file_path: str) -> List[Document]:
 
 def split_document(docs: List[Document], chunk_size: int = None, chunk_overlap: int = None) -> List[Document]:
     """
-    分割文档为小块
+    分割文档为小块（固定长度策略，保持向后兼容）
     
     Args:
         docs: 文档对象列表
@@ -113,3 +113,38 @@ def split_document(docs: List[Document], chunk_size: int = None, chunk_overlap: 
     chunks = text_splitter.split_documents(docs)
     
     return chunks
+
+
+def split_document_with_strategy(
+    docs: List[Document], 
+    strategy: str = 'fixed',
+    chunk_size: int = None, 
+    chunk_overlap: int = None,
+    embeddings_model=None
+) -> List[Document]:
+    """
+    使用指定策略分割文档
+    
+    Args:
+        docs: 文档对象列表
+        strategy: 分块策略
+        chunk_size: 块大小
+        chunk_overlap: 块重叠大小
+        embeddings_model: 嵌入模型（用于语义分块）
+        
+    Returns:
+        List[Document]: 分割后的文档块列表
+    """
+    if chunk_size is None:
+        chunk_size = DEFAULT_CHUNK_SIZE
+    if chunk_overlap is None:
+        chunk_overlap = DEFAULT_CHUNK_OVERLAP
+    
+    from app.utils.chunkers import get_chunker
+    
+    chunker = get_chunker(strategy, chunk_size, chunk_overlap)
+    
+    if strategy == 'semantic' and embeddings_model:
+        chunker.embeddings_model = embeddings_model
+    
+    return chunker.split(docs)
