@@ -13,6 +13,26 @@
           <view class="tool-arrow">›</view>
         </view>
         
+        <!-- 模板管理工具 -->
+        <view class="tool-card" @tap="navigateToTool('template')">
+          <view class="tool-icon">📑</view>
+          <view class="tool-info">
+            <text class="tool-name">模板管理</text>
+            <text class="tool-desc">上传和管理文档模板，支持Word/PDF</text>
+          </view>
+          <view class="tool-arrow">›</view>
+        </view>
+        
+        <!-- 智能文档生成工具 -->
+        <view class="tool-card" @tap="navigateToTool('doc-generate')">
+          <view class="tool-icon">✍️</view>
+          <view class="tool-info">
+            <text class="tool-name">文档生成</text>
+            <text class="tool-desc">基于模板和AI智能生成专业文档</text>
+          </view>
+          <view class="tool-arrow">›</view>
+        </view>
+        
         <!-- 占位卡片 - 未来功能 -->
         <view class="tool-card disabled">
           <view class="tool-icon">🔄</view>

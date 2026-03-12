@@ -279,7 +279,7 @@ class DocumentChunkDAO(BaseMapper):
         """删除文档的所有分块"""
         try:
             mapper = cls()
-            result = mapper.delete_by_conditions({"document_id": document_id})
+            result = mapper.delete({"document_id": document_id})
             return result
         except Exception as e:
             log_.error(f"删除文档分块失败: {str(e)}")

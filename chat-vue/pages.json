@@ -60,6 +60,20 @@
 			}
 		},
 		{
+			"path": "pages/tools/template/index",
+			"style": {
+				"navigationBarTitleText": "模板管理",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/tools/doc-generate/index",
+			"style": {
+				"navigationBarTitleText": "文档生成",
+				"navigationStyle": "custom"
+			}
+		},
+		{
 			"path": "pages/settings/index",
 			"style": {
 				"navigationBarTitleText": "系统设置",

@@ -9,6 +9,8 @@ CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;
 -- ====================================================================
 -- 删除旧表（按依赖顺序）
 -- ====================================================================
+DROP TABLE IF EXISTS "public"."dodo_doc_generations" CASCADE;
+DROP TABLE IF EXISTS "public"."dodo_templates" CASCADE;
 DROP TABLE IF EXISTS "public"."dodo_message_documents" CASCADE;
 DROP TABLE IF EXISTS "public"."dodo_messages" CASCADE;
 DROP TABLE IF EXISTS "public"."dodo_conversations" CASCADE;
@@ -28,6 +30,8 @@ DROP SEQUENCE IF EXISTS "public"."dodo_documents_id_seq" CASCADE;
 DROP SEQUENCE IF EXISTS "public"."dodo_document_chunks_id_seq" CASCADE;
 DROP SEQUENCE IF EXISTS "public"."dodo_conversations_id_seq" CASCADE;
 DROP SEQUENCE IF EXISTS "public"."dodo_messages_id_seq" CASCADE;
+DROP SEQUENCE IF EXISTS "public"."dodo_doc_generations_id_seq" CASCADE;
+DROP SEQUENCE IF EXISTS "public"."dodo_templates_id_seq" CASCADE;
 DROP SEQUENCE IF EXISTS "public"."dodo_message_documents_id_seq" CASCADE;
 
 -- ====================================================================
@@ -41,6 +45,8 @@ CREATE SEQUENCE "public"."dodo_document_chunks_id_seq" INCREMENT 1 MINVALUE 1 MA
 CREATE SEQUENCE "public"."dodo_conversations_id_seq" INCREMENT 1 MINVALUE 1 MAXVALUE 2147483647 START 1 CACHE 1;
 CREATE SEQUENCE "public"."dodo_messages_id_seq" INCREMENT 1 MINVALUE 1 MAXVALUE 2147483647 START 1 CACHE 1;
 CREATE SEQUENCE "public"."dodo_message_documents_id_seq" INCREMENT 1 MINVALUE 1 MAXVALUE 2147483647 START 1 CACHE 1;
+CREATE SEQUENCE "public"."dodo_templates_id_seq" INCREMENT 1 MINVALUE 1 MAXVALUE 2147483647 START 1 CACHE 1;
+CREATE SEQUENCE "public"."dodo_doc_generations_id_seq" INCREMENT 1 MINVALUE 1 MAXVALUE 2147483647 START 1 CACHE 1;
 
 -- ====================================================================
 -- 创建表
@@ -174,6 +180,49 @@ CREATE TABLE "public"."dodo_kb_documents" (
 );
 CREATE INDEX "idx_dodo_kb_documents_kb_id" ON "public"."dodo_kb_documents" ("kb_id");
 CREATE INDEX "idx_dodo_kb_documents_document_id" ON "public"."dodo_kb_documents" ("document_id");
+
+-- 模板表
+CREATE TABLE "public"."dodo_templates" (
+    "id" int4 NOT NULL DEFAULT nextval('dodo_templates_id_seq'::regclass),
+    "name" varchar(255) NOT NULL,
+    "tag" varchar(50) NOT NULL,
+    "file_type" varchar(20) NOT NULL,
+    "minio_path" varchar(255) NOT NULL,
+    "file_size" int4,
+    "created_by" int4 NOT NULL,
+    "created_at" timestamptz(6) DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY ("id"),
+    FOREIGN KEY ("created_by") REFERENCES "public"."dodo_users" ("id") ON DELETE CASCADE
+);
+CREATE INDEX "idx_dodo_templates_created_by" ON "public"."dodo_templates" ("created_by");
+CREATE INDEX "idx_dodo_templates_tag" ON "public"."dodo_templates" ("tag");
+COMMENT ON COLUMN "public"."dodo_templates"."name" IS '模板名称';
+COMMENT ON COLUMN "public"."dodo_templates"."tag" IS '模板标签：简历、论文、报告、合同等';
+COMMENT ON COLUMN "public"."dodo_templates"."file_type" IS '文件类型：word/pdf';
+COMMENT ON COLUMN "public"."dodo_templates"."minio_path" IS 'MinIO存储路径';
+
+-- 文档生成结果表
+CREATE TABLE "public"."dodo_doc_generations" (
+    "id" int4 NOT NULL DEFAULT nextval('dodo_doc_generations_id_seq'::regclass),
+    "user_id" int4 NOT NULL,
+    "template_id" int4 NOT NULL,
+    "user_input" text NOT NULL,
+    "generated_content" text,
+    "word_minio_path" varchar(255),
+    "pdf_minio_path" varchar(255),
+    "status" varchar(20) DEFAULT 'pending',
+    "created_at" timestamptz(6) DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY ("id"),
+    FOREIGN KEY ("user_id") REFERENCES "public"."dodo_users" ("id") ON DELETE CASCADE,
+    FOREIGN KEY ("template_id") REFERENCES "public"."dodo_templates" ("id") ON DELETE CASCADE
+);
+CREATE INDEX "idx_dodo_doc_generations_user_id" ON "public"."dodo_doc_generations" ("user_id");
+CREATE INDEX "idx_dodo_doc_generations_template_id" ON "public"."dodo_doc_generations" ("template_id");
+CREATE INDEX "idx_dodo_doc_generations_status" ON "public"."dodo_doc_generations" ("status");
+COMMENT ON COLUMN "public"."dodo_doc_generations"."user_input" IS '用户输入内容';
+COMMENT ON COLUMN "public"."dodo_doc_generations"."generated_content" IS 'AI生成内容';
+COMMENT ON COLUMN "public"."dodo_doc_generations"."word_minio_path" IS 'Word文件MinIO路径';
+COMMENT ON COLUMN "public"."dodo_doc_generations"."pdf_minio_path" IS 'PDF文件MinIO路径';
 
 -- ====================================================================
 -- 完成！

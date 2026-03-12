@@ -571,4 +571,79 @@ export function safeUniApiCall(apiName, options = {}) {
       reject(e);
     }
   });
-} 
+}
+
+/**
+ * 模板管理API
+ */
+export const templateApi = {
+  /**
+   * 获取模板列表
+   * @param {Object} params - 查询参数 (tag, keyword)
+   */
+  getTemplates(params = {}) {
+    return api.get('/llm/templates', params);
+  },
+
+  /**
+   * 上传模板文件
+   * @param {String} filePath - 文件路径
+   * @param {Object} formData - 表单数据 (name, tags)
+   */
+  uploadTemplate(filePath, formData = {}) {
+    return api.upload('/llm/templates', filePath, formData);
+  },
+
+  /**
+   * 删除模板
+   * @param {String|Number} templateId - 模板ID
+   */
+  deleteTemplate(templateId) {
+    return api.delete(`/llm/templates/${templateId}`);
+  },
+
+  /**
+   * 获取模板详情
+   * @param {String|Number} templateId - 模板ID
+   */
+  getTemplateDetail(templateId) {
+    return api.get(`/llm/templates/${templateId}`);
+  }
+};
+
+/**
+ * 文档生成API
+ */
+export const docGenerateApi = {
+  /**
+   * 生成文档
+   * @param {Object} data - 请求数据 (templateId, userInput)
+   */
+  generateDocument(data) {
+    return api.post('/llm/doc/generate', data);
+  },
+
+  /**
+   * 获取生成历史
+   */
+  getHistory() {
+    return api.get('/llm/doc/history');
+  },
+
+  /**
+   * 获取生成结果详情
+   * @param {String|Number} resultId - 结果ID
+   */
+  getResultDetail(resultId) {
+    return api.get(`/llm/doc/result/${resultId}`);
+  },
+
+  /**
+   * 下载生成的文档
+   * @param {String|Number} resultId - 结果ID
+   * @param {String} format - 格式 (word, pdf)
+   */
+  downloadDocument(resultId, format = 'word') {
+    return api.get(`/llm/doc/download/${resultId}/${format}`);
+  }
+};
