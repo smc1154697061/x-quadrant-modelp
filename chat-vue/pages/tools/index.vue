@@ -3,32 +3,12 @@
     <view class="tools-container">
       <!-- 工具卡片列表 -->
       <view class="tools-grid" :class="{ 'tools-grid-pc': isPc }">
-        <!-- 智能文档生成 -->
-        <view class="tool-card" @tap="navigateToTool('template-generate')">
-          <view class="tool-icon" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">生成</view>
+        <!-- 智能模板 - 整合文档生成、模板管理、生成历史 -->
+        <view class="tool-card" @tap="navigateToTool('smart-template')">
+          <view class="tool-icon" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">✨</view>
           <view class="tool-info">
-            <text class="tool-name">智能文档生成</text>
-            <text class="tool-desc">基于模板快速生成专业文档</text>
-          </view>
-          <view class="tool-arrow">›</view>
-        </view>
-
-        <!-- 模板管理 -->
-        <view class="tool-card" @tap="navigateToTool('template-manage')">
-          <view class="tool-icon" style="background: linear-gradient(135deg, #fc4a1a 0%, #f7b733 100%);">模板</view>
-          <view class="tool-info">
-            <text class="tool-name">模板管理</text>
-            <text class="tool-desc">上传和管理文档模板</text>
-          </view>
-          <view class="tool-arrow">›</view>
-        </view>
-
-        <!-- 生成历史 -->
-        <view class="tool-card" @tap="navigateToTool('template-history')">
-          <view class="tool-icon" style="background: linear-gradient(135deg, #5f72bd 0%, #9b23ea 100%);">历史</view>
-          <view class="tool-info">
-            <text class="tool-name">生成历史</text>
-            <text class="tool-desc">查看和管理生成记录</text>
+            <text class="tool-name">智能模板</text>
+            <text class="tool-desc">模板管理、文档生成、历史记录一站式服务</text>
           </view>
           <view class="tool-arrow">›</view>
         </view>

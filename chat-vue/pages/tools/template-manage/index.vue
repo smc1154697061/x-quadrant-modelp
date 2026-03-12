@@ -89,6 +89,15 @@
         <text class="fab-icon">+</text>
       </view>
       
+      <!-- 隐藏的文件input，放在弹窗外面避免事件被阻止 -->
+      <input 
+        type="file" 
+        ref="fileInput"
+        class="global-file-input"
+        accept=".doc,.docx,.pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf"
+        @change="onFileSelected"
+      />
+      
       <!-- 上传弹窗 -->
       <uni-popup ref="uploadPopup" type="center">
         <view class="upload-modal">
@@ -101,7 +110,7 @@
             <!-- 文件选择 -->
             <view class="form-item">
               <text class="form-label">选择文件</text>
-              <view class="file-picker" @tap="chooseFile">
+              <view class="file-picker" @click="triggerFileInput">
                 <text v-if="!selectedFile" class="file-placeholder">点击选择Word或PDF文件</text>
                 <text v-else class="file-name">{{ selectedFile.name }}</text>
               </view>
@@ -281,26 +290,66 @@ export default {
       this.$refs.uploadPopup.close();
     },
     
-    // 选择文件
-    chooseFile() {
-      uni.chooseFile({
-        count: 1,
-        type: 'all',
-        extension: ['.doc', '.docx', '.pdf'],
-        success: (res) => {
-          const file = res.tempFiles[0];
-          const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
-          if (!['.doc', '.docx', '.pdf'].includes(ext)) {
-            uni.showToast({ title: '仅支持Word和PDF文件', icon: 'none' });
-            return;
-          }
-          this.selectedFile = file;
-          // 自动填充名称
-          if (!this.uploadForm.name) {
-            this.uploadForm.name = file.name.substring(0, file.name.lastIndexOf('.'));
-          }
+    // 触发文件选择
+    triggerFileInput() {
+      // 动态创建input元素选择文件（最可靠的H5方法）
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.doc,.docx,.pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf';
+      
+      input.onchange = (e) => {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+        
+        const file = files[0];
+        const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+        
+        if (!['.doc', '.docx', '.pdf'].includes(ext)) {
+          uni.showToast({ title: '仅支持Word和PDF文件', icon: 'none' });
+          return;
         }
-      });
+        
+        this.selectedFile = {
+          name: file.name,
+          size: file.size,
+          path: URL.createObjectURL(file),
+          fileObj: file
+        };
+        
+        if (!this.uploadForm.name) {
+          this.uploadForm.name = file.name.substring(0, file.name.lastIndexOf('.'));
+        }
+      };
+      
+      input.click();
+    },
+    
+    // 文件选择回调（保留以防ref方式工作）
+    onFileSelected(e) {
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+      
+      const file = files[0];
+      const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+      
+      if (!['.doc', '.docx', '.pdf'].includes(ext)) {
+        uni.showToast({ title: '仅支持Word和PDF文件', icon: 'none' });
+        e.target.value = '';
+        return;
+      }
+      
+      this.selectedFile = {
+        name: file.name,
+        size: file.size,
+        path: URL.createObjectURL(file),
+        fileObj: file
+      };
+      
+      if (!this.uploadForm.name) {
+        this.uploadForm.name = file.name.substring(0, file.name.lastIndexOf('.'));
+      }
+      
+      e.target.value = '';
     },
     
     // 切换标签
@@ -325,7 +374,8 @@ export default {
           tags: this.uploadForm.tags.join(',')
         };
         
-        const res = await api.upload('/llm/templates', this.selectedFile.path, formData);
+        const filePath = this.selectedFile;
+        const res = await api.upload('/llm/templates', filePath, formData);
         
         if (res.code === 'SUCCESS') {
           uni.showToast({ title: '上传成功', icon: 'success' });
@@ -683,5 +733,14 @@ export default {
   padding: 30rpx;
   color: #999;
   font-size: 26rpx;
+}
+
+/* 全局文件input隐藏 */
+.global-file-input {
+  position: fixed;
+  top: -9999px;
+  left: -9999px;
+  opacity: 0;
+  pointer-events: none;
 }
 </style>

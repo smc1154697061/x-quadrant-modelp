@@ -37,7 +37,7 @@ class KnowledgeService:
         self.allowed_extensions = {
             'txt', 'pdf', 'doc', 'docx', 'csv', 'xls', 'xlsx', 
             'ppt', 'pptx', 'md', 'html', 'htm',
-            'jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'
+            'jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'tiff', 'tif'
         }
         self._presigned_url_cache = {}  # 添加预签名URL缓存
         self._cache_expiry = {}  # URL过期时间缓存

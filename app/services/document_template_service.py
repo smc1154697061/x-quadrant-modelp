@@ -36,8 +36,12 @@ class DocumentTemplateService:
             dict: 上传结果
         """
         try:
-            # 确定文件类型
-            file_ext = os.path.splitext(file_name)[1].lower()
+            log_.info(f"开始上传模板: user_id={user_id}, file_name={file_name}")
+            
+            # 确定文件类型 - 使用file_path确保获取正确的扩展名
+            file_ext = os.path.splitext(file_path)[1].lower()
+            log_.info(f"文件扩展名: {file_ext}")
+            
             if file_ext in ['.doc', '.docx']:
                 file_type = 'word'
             elif file_ext == '.pdf':
@@ -47,11 +51,15 @@ class DocumentTemplateService:
             
             # 生成MinIO存储路径
             object_name = f"templates/{user_id}/{uuid.uuid4()}{file_ext}"
+            log_.info(f"MinIO路径: {object_name}")
             
             # 上传到MinIO
+            log_.info(f"开始上传到MinIO, 文件路径: {file_path}")
             self.minio_client.upload_file(file_path, object_name)
+            log_.info("MinIO上传成功")
             
             # 保存到数据库
+            log_.info("开始保存到数据库")
             template = DocumentTemplate(
                 name=file_name,
                 tags=tags,
@@ -61,6 +69,7 @@ class DocumentTemplateService:
                 created_by=user_id
             )
             template_id = self.template_dao.insert(template)
+            log_.info(f"数据库保存成功, template_id={template_id}")
             
             return {
                 'success': True,
@@ -69,7 +78,9 @@ class DocumentTemplateService:
             }
         
         except Exception as e:
-            log_.error(f"上传模板失败: {str(e)}")
+            import traceback
+            error_detail = traceback.format_exc()
+            log_.error(f"上传模板失败: {str(e)}\n详细错误:\n{error_detail}")
             return {'success': False, 'message': f'上传失败: {str(e)}'}
     
     def get_template_list(self, user_id, tag=None, search=None):
@@ -163,8 +174,12 @@ class DocumentTemplateService:
             )
             generation_id = self.generation_dao.insert(generation)
             
-            # 下载模板文件
-            local_template_path = f"/tmp/{uuid.uuid4()}_{template['name']}"
+            # 下载模板文件（使用系统临时目录，兼容Windows）
+            import tempfile
+            temp_dir = tempfile.gettempdir()
+            file_ext = os.path.splitext(template['minio_path'])[1]
+            safe_name = template['name'].replace(os.sep, '_')
+            local_template_path = os.path.join(temp_dir, f"{uuid.uuid4()}_{safe_name}{file_ext}")
             self.minio_client.download_file(template['minio_path'], local_template_path)
             
             # 读取模板内容
@@ -271,3 +286,182 @@ class DocumentTemplateService:
             return None
         
         return self.minio_client.get_presigned_url(template['minio_path'])
+    
+    def export_generation(self, generation_id, user_id, export_format='word'):
+        """
+        导出生成的文档为Word或PDF格式
+        
+        Args:
+            generation_id: 生成记录ID
+            user_id: 用户ID
+            export_format: 导出格式 ('word' 或 'pdf')
+        
+        Returns:
+            dict: 包含文件路径和文件名的字典
+        """
+        try:
+            # 获取生成记录
+            generation = self.generation_dao.find_by_id_and_user(generation_id, user_id)
+            if not generation:
+                return {'success': False, 'message': '记录不存在或无权限'}
+            
+            if generation['status'] != 'completed':
+                return {'success': False, 'message': '文档尚未生成完成'}
+            
+            content = generation['generated_content']
+            template_name = generation.get('template_name', '文档')
+            
+            # 生成文件（使用系统临时目录，兼容Windows）
+            import tempfile
+            temp_dir = tempfile.gettempdir()
+            os.makedirs(temp_dir, exist_ok=True)
+            
+            if export_format == 'word':
+                # 生成Word文档
+                file_path = self._generate_word(content, template_name, temp_dir)
+                file_name = f"{template_name}.docx"
+                content_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            elif export_format == 'pdf':
+                # 生成PDF文档
+                file_path = self._generate_pdf(content, template_name, temp_dir)
+                file_name = f"{template_name}.pdf"
+                content_type = 'application/pdf'
+            else:
+                return {'success': False, 'message': '不支持的导出格式'}
+            
+            return {
+                'success': True,
+                'file_path': file_path,
+                'file_name': file_name,
+                'content_type': content_type
+            }
+        
+        except Exception as e:
+            log_.error(f"导出文档失败: {str(e)}")
+            return {'success': False, 'message': f'导出失败: {str(e)}'}
+    
+    def _generate_word(self, content, file_name, temp_dir):
+        """
+        生成Word文档
+        
+        Args:
+            content: 文档内容
+            file_name: 文件名
+            temp_dir: 临时目录
+        
+        Returns:
+            str: 文件路径
+        """
+        try:
+            from docx import Document
+            from docx.shared import Pt, Inches
+            from docx.enum.text import WD_ALIGN_PARAGRAPH
+        except ImportError:
+            raise ImportError("python-docx库未安装，请使用 'pip install python-docx' 安装")
+        
+        doc = Document()
+        
+        # 设置标题
+        title = doc.add_heading(file_name, level=0)
+        title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        
+        # 添加内容，处理换行
+        paragraphs = content.split('\n')
+        for para_text in paragraphs:
+            if para_text.strip():
+                para = doc.add_paragraph(para_text)
+                para.paragraph_format.first_line_indent = Inches(0.5)
+        
+        # 保存文件
+        file_path = os.path.join(temp_dir, f"{uuid.uuid4()}_{file_name}.docx")
+        doc.save(file_path)
+        
+        return file_path
+    
+    def _generate_pdf(self, content, file_name, temp_dir):
+        """
+        生成PDF文档
+        
+        Args:
+            content: 文档内容
+            file_name: 文件名
+            temp_dir: 临时目录
+        
+        Returns:
+            str: 文件路径
+        """
+        try:
+            from reportlab.lib.pagesizes import A4
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+            from reportlab.pdfbase import pdfmetrics
+            from reportlab.pdfbase.ttfonts import TTFont
+            from reportlab.lib.units import inch
+            
+            # 尝试注册中文字体
+            try:
+                # Windows系统字体路径
+                font_paths = [
+                    'C:/Windows/Fonts/simsun.ttc',
+                    'C:/Windows/Fonts/msyh.ttc',
+                    'C:/Windows/Fonts/simhei.ttf',
+                    '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc',
+                    '/usr/share/fonts/truetype/arphic/uming.ttc'
+                ]
+                font_registered = False
+                for font_path in font_paths:
+                    if os.path.exists(font_path):
+                        pdfmetrics.registerFont(TTFont('ChineseFont', font_path))
+                        font_registered = True
+                        break
+                
+                if not font_registered:
+                    # 如果没有找到中文字体，使用默认字体
+                    chinese_font = 'Helvetica'
+                else:
+                    chinese_font = 'ChineseFont'
+            except:
+                chinese_font = 'Helvetica'
+            
+            file_path = os.path.join(temp_dir, f"{uuid.uuid4()}_{file_name}.pdf")
+            doc = SimpleDocTemplate(file_path, pagesize=A4)
+            
+            styles = getSampleStyleSheet()
+            # 创建中文样式
+            chinese_style = ParagraphStyle(
+                'ChineseStyle',
+                parent=styles['Normal'],
+                fontName=chinese_font,
+                fontSize=12,
+                leading=20,
+                firstLineIndent=24
+            )
+            
+            title_style = ParagraphStyle(
+                'TitleStyle',
+                parent=styles['Title'],
+                fontName=chinese_font,
+                fontSize=18,
+                alignment=1  # 居中
+            )
+            
+            story = []
+            
+            # 添加标题
+            story.append(Paragraph(file_name, title_style))
+            story.append(Spacer(1, 0.5*inch))
+            
+            # 添加内容
+            paragraphs = content.split('\n')
+            for para_text in paragraphs:
+                if para_text.strip():
+                    # 处理特殊字符
+                    safe_text = para_text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                    story.append(Paragraph(safe_text, chinese_style))
+                    story.append(Spacer(1, 6))
+            
+            doc.build(story)
+            return file_path
+            
+        except ImportError:
+            raise ImportError("reportlab库未安装，请使用 'pip install reportlab' 安装")
