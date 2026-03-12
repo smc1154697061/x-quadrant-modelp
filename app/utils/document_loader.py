@@ -113,3 +113,23 @@ def split_document(docs: List[Document], chunk_size: int = None, chunk_overlap: 
     chunks = text_splitter.split_documents(docs)
     
     return chunks
+
+
+class DocumentLoader:
+    """文档加载器类"""
+    
+    def load(self, file_path: str) -> str:
+        """
+        加载文档并返回文本内容
+        
+        Args:
+            file_path: 文件路径
+            
+        Returns:
+            str: 文档文本内容
+        """
+        docs = load_document(file_path)
+        if docs:
+            # 合并所有文档内容
+            return "\n\n".join([doc.page_content for doc in docs])
+        return ""

@@ -3,37 +3,59 @@
     <view class="tools-container">
       <!-- 工具卡片列表 -->
       <view class="tools-grid" :class="{ 'tools-grid-pc': isPc }">
+        <!-- 智能文档生成 -->
+        <view class="tool-card" @tap="navigateToTool('template-generate')">
+          <view class="tool-icon" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">生成</view>
+          <view class="tool-info">
+            <text class="tool-name">智能文档生成</text>
+            <text class="tool-desc">基于模板快速生成专业文档</text>
+          </view>
+          <view class="tool-arrow">›</view>
+        </view>
+
+        <!-- 模板管理 -->
+        <view class="tool-card" @tap="navigateToTool('template-manage')">
+          <view class="tool-icon" style="background: linear-gradient(135deg, #fc4a1a 0%, #f7b733 100%);">模板</view>
+          <view class="tool-info">
+            <text class="tool-name">模板管理</text>
+            <text class="tool-desc">上传和管理文档模板</text>
+          </view>
+          <view class="tool-arrow">›</view>
+        </view>
+
+        <!-- 生成历史 -->
+        <view class="tool-card" @tap="navigateToTool('template-history')">
+          <view class="tool-icon" style="background: linear-gradient(135deg, #5f72bd 0%, #9b23ea 100%);">历史</view>
+          <view class="tool-info">
+            <text class="tool-name">生成历史</text>
+            <text class="tool-desc">查看和管理生成记录</text>
+          </view>
+          <view class="tool-arrow">›</view>
+        </view>
+
         <!-- 内容提取工具 -->
         <view class="tool-card" @tap="navigateToTool('extraction')">
-          <view class="tool-icon">📄</view>
+          <view class="tool-icon">提取</view>
           <view class="tool-info">
             <text class="tool-name">内容提取</text>
             <text class="tool-desc">智能提取文件内容，生成结构化数据</text>
           </view>
           <view class="tool-arrow">›</view>
         </view>
-        
+
         <!-- 占位卡片 - 未来功能 -->
         <view class="tool-card disabled">
-          <view class="tool-icon">🔄</view>
+          <view class="tool-icon">JSON</view>
           <view class="tool-info">
             <text class="tool-name">JSON转换</text>
             <text class="tool-desc">敬请期待</text>
           </view>
         </view>
-        
+
         <view class="tool-card disabled">
-          <view class="tool-icon">📅</view>
+          <view class="tool-icon">日期</view>
           <view class="tool-info">
             <text class="tool-name">日期转换</text>
-            <text class="tool-desc">敬请期待</text>
-          </view>
-        </view>
-        
-        <view class="tool-card disabled">
-          <view class="tool-icon">🔢</view>
-          <view class="tool-info">
-            <text class="tool-name">进制转换</text>
             <text class="tool-desc">敬请期待</text>
           </view>
         </view>
@@ -116,7 +138,9 @@ export default {
 }
 
 .tool-icon {
-  font-size: 60rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #fff;
   width: 80rpx;
   height: 80rpx;
   display: flex;
