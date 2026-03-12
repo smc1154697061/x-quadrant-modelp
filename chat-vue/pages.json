@@ -75,6 +75,13 @@
 			}
 		},
 		{
+			"path": "pages/tools/watermark/index",
+			"style": {
+				"navigationBarTitleText": "文档水印",
+				"navigationStyle": "custom"
+			}
+		},
+		{
 			"path": "pages/settings/index",
 			"style": {
 				"navigationBarTitleText": "系统设置",

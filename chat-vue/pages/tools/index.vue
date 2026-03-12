@@ -23,6 +23,16 @@
           <view class="tool-arrow">›</view>
         </view>
 
+        <!-- 文档水印工具 -->
+        <view class="tool-card" @tap="navigateToTool('watermark')">
+          <view class="tool-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">水印</view>
+          <view class="tool-info">
+            <text class="tool-name">文档水印</text>
+            <text class="tool-desc">为图片和PDF添加自定义文字/图片水印</text>
+          </view>
+          <view class="tool-arrow">›</view>
+        </view>
+
         <!-- 占位卡片 - 未来功能 -->
         <view class="tool-card disabled">
           <view class="tool-icon">JSON</view>
