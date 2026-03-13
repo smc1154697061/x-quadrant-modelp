@@ -61,6 +61,7 @@
 import WatermarkEditor from './WatermarkEditor.vue';
 import WatermarkPreview from './WatermarkPreview.vue';
 import { platformUtils } from '../../../utils/platform-adapter.js';
+import router from '../../../utils/router.js';
 
 export default {
   components: {
@@ -98,7 +99,7 @@ export default {
   
   methods: {
     goBack() {
-      uni.navigateBack();
+      router.navigateBack();
     },
     
     selectFile() {

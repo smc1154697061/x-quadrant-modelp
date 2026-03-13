@@ -146,6 +146,7 @@
 
 <script>
 import api from '../../../utils/api.js';
+import router from '../../../utils/router.js';
 
 export default {
   data() {
@@ -217,7 +218,7 @@ export default {
   
   methods: {
     goBack() {
-      uni.navigateBack();
+      router.navigateBack();
     },
     
     selectFile() {
