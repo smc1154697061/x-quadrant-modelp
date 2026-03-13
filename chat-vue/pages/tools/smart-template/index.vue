@@ -1,5 +1,5 @@
 <template>
-  <app-layout title="智能模板" :showBack="true">
+  <app-layout ref="appLayout" title="智能模板" :showBack="true">
     <view class="smart-template-container">
       <!-- 顶部标签栏 -->
       <view class="tab-bar">
@@ -89,6 +89,7 @@ import TemplateGeneratePanel from './components/GeneratePanel.vue';
 import TemplateManagePanel from './components/ManagePanel.vue';
 import TemplateHistoryPanel from './components/HistoryPanel.vue';
 import api from '../../../utils/api';
+import router from '../../../utils/router.js';
 
 export default {
   components: {
@@ -112,6 +113,18 @@ export default {
   onLoad(options) {
     if (options.tab) {
       this.currentTab = options.tab;
+    }
+    if (this.$refs.appLayout) {
+      this.$refs.appLayout.goBack = () => router.navigateBack();
+    }
+  },
+  onBackPress() {
+    router.navigateBack();
+    return true;
+  },
+  mounted() {
+    if (this.$refs.appLayout) {
+      this.$refs.appLayout.goBack = () => router.navigateBack();
     }
   },
   methods: {

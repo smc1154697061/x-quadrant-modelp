@@ -1,5 +1,5 @@
 <template>
-  <app-layout title="模板管理">
+  <app-layout ref="appLayout" title="模板管理" :showBack="true">
     <view class="template-manage-container">
       <!-- 搜索和筛选区域 -->
       <view class="filter-section">
@@ -157,6 +157,7 @@
 <script>
 import AppLayout from '../../../components/layout/AppLayout.vue';
 import api from '../../../utils/api.js';
+import router from '../../../utils/router.js';
 
 export default {
   components: {
@@ -183,6 +184,18 @@ export default {
   },
   onLoad() {
     this.loadTemplates();
+    if (this.$refs.appLayout) {
+      this.$refs.appLayout.goBack = () => router.navigateBack();
+    }
+  },
+  onBackPress() {
+    router.navigateBack();
+    return true;
+  },
+  mounted() {
+    if (this.$refs.appLayout) {
+      this.$refs.appLayout.goBack = () => router.navigateBack();
+    }
   },
   onShow() {
     this.loadTemplates();
