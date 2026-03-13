@@ -141,3 +141,9 @@ class JSONParseError(APIException):
     """JSON解析错误"""
     def __init__(self, data=None, msg=None):
         super().__init__(ErrorCode.JSON_PARSE_ERROR, data, msg)
+
+
+class ForbiddenError(APIException):
+    """权限不足错误"""
+    def __init__(self, data=None, msg=None):
+        super().__init__(ErrorCode.PERMISSION_DENIED, data, msg)

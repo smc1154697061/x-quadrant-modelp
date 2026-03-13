@@ -44,6 +44,19 @@
         @update:visible="onLoginVisibleChange"
       />
       
+      <!-- 组织管理 -->
+      <view class="section">
+        <view class="section-title">组织管理</view>
+        <view class="setting-group">
+          <view class="setting-item clickable" @tap="navigateToOrganization">
+            <text class="setting-label">我的组织</text>
+            <view class="setting-value">
+              <text class="icon-arrow">›</text>
+            </view>
+          </view>
+        </view>
+      </view>
+      
       <!-- 关于 -->
       <view class="section">
         <view class="section-title">关于</view>
@@ -161,6 +174,11 @@ export default {
           });
         }
       });
+    },
+    
+    // 跳转到组织管理页面
+    navigateToOrganization() {
+      this.navigateTo('/pages/organization/index');
     },
     
     // 加载设置

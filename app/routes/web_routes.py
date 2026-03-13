@@ -9,6 +9,7 @@ from app.controllers.knowledge_controller import SimpleKnowledgeController, Know
 from app.controllers.auth_controller import AuthCodeResource, AuthLoginRegisterResource, AuthVerifyTokenResource
 from app.controllers.file_controller import FileController
 from app.controllers.document_template_controller import DocumentTemplateController, DocumentGenerationController, GenerationHistoryController, DocumentExportController
+from app.controllers.organization_controller import OrganizationListResource, OrganizationDetailResource, OrganizationMemberResource
 from app.services.chat_service import ChatService
 from app.services.bot_service import BotService
 from common import log_
@@ -80,6 +81,11 @@ api.add_resource(GenerationHistoryController, '/llm/generations/<int:generation_
 
 # 文档导出API
 api.add_resource(DocumentExportController, '/llm/generations/<int:generation_id>/export', endpoint='generation_export')
+
+# 组织管理API
+api.add_resource(OrganizationListResource, '/llm/organizations', endpoint='organizations')
+api.add_resource(OrganizationDetailResource, '/llm/organizations/<int:org_id>', endpoint='organization_detail')
+api.add_resource(OrganizationMemberResource, '/llm/organizations/<int:org_id>/members/<int:member_id>', endpoint='organization_member')
 
 # 流式聊天API - 使用蓝图直接注册以避免RESTful的JSON序列化
 stream_chat_service = ChatService()

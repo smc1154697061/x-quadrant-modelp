@@ -18,10 +18,14 @@ DROP TABLE IF EXISTS "public"."dodo_documents" CASCADE;
 DROP TABLE IF EXISTS "public"."dodo_bot_knowledge_bases" CASCADE;
 DROP TABLE IF EXISTS "public"."dodo_bots" CASCADE;
 DROP TABLE IF EXISTS "public"."dodo_knowledge_bases" CASCADE;
+DROP TABLE IF EXISTS "public"."dodo_organization_members" CASCADE;
+DROP TABLE IF EXISTS "public"."dodo_organizations" CASCADE;
 DROP TABLE IF EXISTS "public"."dodo_users" CASCADE;
 
 -- 删除序列
 DROP SEQUENCE IF EXISTS "public"."dodo_users_id_seq" CASCADE;
+DROP SEQUENCE IF EXISTS "public"."dodo_organizations_id_seq" CASCADE;
+DROP SEQUENCE IF EXISTS "public"."dodo_organization_members_id_seq" CASCADE;
 DROP SEQUENCE IF EXISTS "public"."dodo_bots_id_seq" CASCADE;
 DROP SEQUENCE IF EXISTS "public"."dodo_knowledge_bases_id_seq" CASCADE;
 DROP SEQUENCE IF EXISTS "public"."dodo_documents_id_seq" CASCADE;
@@ -34,6 +38,8 @@ DROP SEQUENCE IF EXISTS "public"."dodo_message_documents_id_seq" CASCADE;
 -- 创建序列
 -- ====================================================================
 CREATE SEQUENCE "public"."dodo_users_id_seq" INCREMENT 1 MINVALUE 1 MAXVALUE 2147483647 START 1 CACHE 1;
+CREATE SEQUENCE "public"."dodo_organizations_id_seq" INCREMENT 1 MINVALUE 1 MAXVALUE 2147483647 START 1 CACHE 1;
+CREATE SEQUENCE "public"."dodo_organization_members_id_seq" INCREMENT 1 MINVALUE 1 MAXVALUE 2147483647 START 1 CACHE 1;
 CREATE SEQUENCE "public"."dodo_bots_id_seq" INCREMENT 1 MINVALUE 1 MAXVALUE 2147483647 START 1 CACHE 1;
 CREATE SEQUENCE "public"."dodo_knowledge_bases_id_seq" INCREMENT 1 MINVALUE 1 MAXVALUE 2147483647 START 1 CACHE 1;
 CREATE SEQUENCE "public"."dodo_documents_id_seq" INCREMENT 1 MINVALUE 1 MAXVALUE 2147483647 START 1 CACHE 1;
@@ -58,6 +64,41 @@ CREATE TABLE "public"."dodo_users" (
 CREATE UNIQUE INDEX "idx_dodo_users_email" ON "public"."dodo_users" ("email");
 CREATE UNIQUE INDEX "idx_dodo_users_phone" ON "public"."dodo_users" ("phone");
 COMMENT ON COLUMN "public"."dodo_users"."email" IS '邮箱';
+
+-- 组织表
+CREATE TABLE "public"."dodo_organizations" (
+    "id" int4 NOT NULL DEFAULT nextval('dodo_organizations_id_seq'::regclass),
+    "name" varchar(100) NOT NULL,
+    "description" text,
+    "created_by" int4 NOT NULL,
+    "created_at" timestamptz(6) DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY ("id"),
+    FOREIGN KEY ("created_by") REFERENCES "public"."dodo_users" ("id") ON DELETE NO ACTION
+);
+CREATE INDEX "idx_dodo_organizations_created_by" ON "public"."dodo_organizations" ("created_by");
+COMMENT ON TABLE "public"."dodo_organizations" IS '组织表';
+COMMENT ON COLUMN "public"."dodo_organizations"."name" IS '组织名称';
+COMMENT ON COLUMN "public"."dodo_organizations"."description" IS '组织描述';
+COMMENT ON COLUMN "public"."dodo_organizations"."created_by" IS '创建者ID';
+
+-- 组织成员表
+CREATE TABLE "public"."dodo_organization_members" (
+    "id" int4 NOT NULL DEFAULT nextval('dodo_organization_members_id_seq'::regclass),
+    "organization_id" int4 NOT NULL,
+    "user_id" int4 NOT NULL,
+    "role" varchar(20) NOT NULL DEFAULT 'member',
+    "created_at" timestamptz(6) DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY ("id"),
+    FOREIGN KEY ("organization_id") REFERENCES "public"."dodo_organizations" ("id") ON DELETE CASCADE,
+    FOREIGN KEY ("user_id") REFERENCES "public"."dodo_users" ("id") ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX "idx_dodo_org_members_unique" ON "public"."dodo_organization_members" ("organization_id", "user_id");
+CREATE INDEX "idx_dodo_org_members_org_id" ON "public"."dodo_organization_members" ("organization_id");
+CREATE INDEX "idx_dodo_org_members_user_id" ON "public"."dodo_organization_members" ("user_id");
+COMMENT ON TABLE "public"."dodo_organization_members" IS '组织成员表';
+COMMENT ON COLUMN "public"."dodo_organization_members"."organization_id" IS '组织ID';
+COMMENT ON COLUMN "public"."dodo_organization_members"."user_id" IS '用户ID';
+COMMENT ON COLUMN "public"."dodo_organization_members"."role" IS '角色：owner/admin/member';
 
 -- 机器人表
 CREATE TABLE "public"."dodo_bots" (
