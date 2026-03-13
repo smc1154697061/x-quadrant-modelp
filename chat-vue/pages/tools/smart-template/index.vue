@@ -1,6 +1,14 @@
 <template>
   <app-layout title="智能模板" :showBack="true">
     <view class="smart-template-container">
+      <!-- 返回按钮 -->
+      <view class="back-header">
+        <view class="back-btn" @tap="goBack">
+          <text class="back-icon">‹</text>
+          <text class="back-text">返回</text>
+        </view>
+      </view>
+      
       <!-- 顶部标签栏 -->
       <view class="tab-bar">
         <view 
@@ -89,6 +97,7 @@ import TemplateGeneratePanel from './components/GeneratePanel.vue';
 import TemplateManagePanel from './components/ManagePanel.vue';
 import TemplateHistoryPanel from './components/HistoryPanel.vue';
 import api from '../../../utils/api';
+import router from '../../../utils/router.js';
 
 export default {
   components: {
@@ -115,6 +124,10 @@ export default {
     }
   },
   methods: {
+    goBack() {
+      router.navigateBack();
+    },
+    
     switchTab(tab) {
       this.currentTab = tab;
       // 切换到历史记录时刷新数据
@@ -281,6 +294,30 @@ export default {
   background-color: #f5f7fa;
   display: flex;
   flex-direction: column;
+}
+
+/* 返回按钮 */
+.back-header {
+  background: #fff;
+  padding: 20rpx 30rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.06);
+}
+
+.back-btn {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.back-icon {
+  font-size: 48rpx;
+  color: #333;
+  font-weight: 300;
+}
+
+.back-text {
+  font-size: 28rpx;
+  color: #333;
 }
 
 /* 标签栏 */

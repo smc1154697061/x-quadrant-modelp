@@ -31,10 +31,51 @@ class Router {
   }
   
   /**
-   * 返回页面
+   * 返回页面，主动判断是否有可返回的历史记录
+   * @param {number} delta - 返回的页面层数
    */
   navigateBack(delta = 1) {
+    const pages = getCurrentPages();
+    const currentPage = pages[pages.length - 1];
+    const currentRoute = currentPage ? `/${currentPage.route}` : '';
+    
+    if (pages.length <= delta) {
+      const fallbackUrl = this._getFallbackUrl(currentRoute);
+      if (fallbackUrl) {
+        uni.switchTab({ url: fallbackUrl });
+      }
+      return;
+    }
+    
     uni.navigateBack({ delta });
+  }
+  
+  /**
+   * 根据当前路径获取fallback URL
+   * @param {string} currentRoute - 当前页面路由
+   * @returns {string} fallback URL
+   */
+  _getFallbackUrl(currentRoute) {
+    if (!currentRoute) return '/pages/knowledge-base/index';
+    
+    if (currentRoute.startsWith('/pages/tools/')) {
+      return '/pages/tools/index';
+    }
+    
+    if (currentRoute.startsWith('/pages/chat-modules/')) {
+      return '/pages/bot-modules/bot-list/index';
+    }
+    
+    if (currentRoute === '/pages/knowledge-base/detail') {
+      return '/pages/knowledge-base/index';
+    }
+    
+    if (currentRoute.startsWith('/pages/bot-modules/bot-detail/') || 
+        currentRoute.startsWith('/pages/bot-modules/edit-bot/')) {
+      return '/pages/bot-modules/bot-list/index';
+    }
+    
+    return '/pages/knowledge-base/index';
   }
   
   _navigate(method, url, params = {}) {
