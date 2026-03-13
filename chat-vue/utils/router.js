@@ -34,7 +34,46 @@ class Router {
    * 返回页面
    */
   navigateBack(delta = 1) {
-    uni.navigateBack({ delta });
+    return new Promise((resolve, reject) => {
+      const pages = getCurrentPages();
+      if (pages.length <= delta) {
+        this._handleFallback();
+        resolve();
+        return;
+      }
+      
+      uni.navigateBack({
+        delta,
+        success: resolve,
+        fail: (err) => {
+          this._handleFallback();
+          resolve(err);
+        }
+      });
+    });
+  }
+  
+  _handleFallback() {
+    const pages = getCurrentPages();
+    if (pages.length === 0) return;
+    
+    const currentPage = pages[pages.length - 1];
+    const route = currentPage.route || currentPage.$page?.fullPath || '';
+    const path = `/${route.replace(/^\//, '')}`;
+    
+    let fallbackUrl = '/pages/tools/index';
+    
+    if (/^\/pages\/tools\//.test(path)) {
+      fallbackUrl = '/pages/tools/index';
+    } else if (/^\/pages\/chat-modules\//.test(path)) {
+      fallbackUrl = '/pages/bot-modules/bot-list/index';
+    } else if (/^\/pages\/knowledge-base\/detail/.test(path)) {
+      fallbackUrl = '/pages/knowledge-base/index';
+    } else if (/^\/pages\/bot-modules\/(bot-detail|edit-bot)\//.test(path)) {
+      fallbackUrl = '/pages/bot-modules/bot-list/index';
+    }
+    
+    uni.switchTab({ url: fallbackUrl });
   }
   
   _navigate(method, url, params = {}) {
