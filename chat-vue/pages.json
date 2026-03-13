@@ -108,6 +108,20 @@
 				"navigationBarTitleText": "编辑机器人",
 				"navigationStyle": "custom"
 			}
+		},
+		{
+			"path": "pages/organization/index",
+			"style": {
+				"navigationBarTitleText": "我的组织",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/organization/detail",
+			"style": {
+				"navigationBarTitleText": "组织详情",
+				"navigationStyle": "custom"
+			}
 		}
 	],
 	"globalStyle": {

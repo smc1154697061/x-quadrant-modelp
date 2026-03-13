@@ -1,7 +1,9 @@
 """
 用户Mapper - MyBatis Plus风格
 """
-from typing import Optional
+from typing import Optional, List, Dict
+from common import log_
+from common.db_utils import get_db_connection
 from app.dao.mapper import BaseMapper, select_one
 from app.entity.user import User
 
@@ -27,6 +29,28 @@ class UserDAO(BaseMapper):
         """通过ID查找用户，返回字典"""
         user = self.select_by_id(user_id)
         return user.to_dict() if user else None
+    
+    def search_by_email(self, email: str, limit: int = 10) -> List[Dict]:
+        """根据邮箱搜索用户
+        
+        参数:
+            email: 邮箱关键字
+            limit: 返回数量限制
+            
+        返回:
+            用户字典列表
+        """
+        sql = f"SELECT * FROM {self.table_name} WHERE email LIKE %s ORDER BY email LIMIT %s"
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                try:
+                    cursor.execute(sql, (f'%{email}%', limit))
+                    columns = [col[0] for col in cursor.description]
+                    results = cursor.fetchall()
+                    return [dict(zip(columns, row)) for row in results]
+                except Exception as e:
+                    log_.error(f"搜索用户失败: {str(e)}")
+                    return []
     
     def create(self, user: User):
         """创建新用户（面向对象风格）
