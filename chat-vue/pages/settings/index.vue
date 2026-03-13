@@ -17,6 +17,19 @@
         </view>
       </view>
       
+      <!-- 账户管理 -->
+      <view class="section">
+        <view class="section-title">账户管理</view>
+        <view class="setting-group">
+          <view class="setting-item clickable" @tap="navigateTo('/pages/organization/index')">
+            <text class="setting-label">我的组织</text>
+            <view class="setting-value">
+              <text class="icon-arrow">›</text>
+            </view>
+          </view>
+        </view>
+      </view>
+      
       <!-- 应用设置 -->
       <view class="section">
         <view class="section-title">渡渡鸟设置</view>
