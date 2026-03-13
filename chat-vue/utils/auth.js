@@ -11,7 +11,9 @@ const authRequiredPages = [
   '/pages/knowledge-base/detail',
   '/pages/chat-modules/chat/index',
   '/pages/bot-modules/bot-list/index',
-  '/pages/tools/index'
+  '/pages/tools/index',
+  '/pages/organization/index',
+  '/pages/organization/detail'
 ];
 
 /**

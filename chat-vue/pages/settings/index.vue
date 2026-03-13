@@ -27,11 +27,24 @@
               <switch :checked="notifications" @change="onNotificationsChange" color="#007bff" />
             </view>
           </view>
-          
+
           <view class="setting-item">
             <text class="setting-label">自动保存对话历史</text>
             <view class="setting-control">
               <switch :checked="autoSave" @change="onAutoSaveChange" color="#007bff" />
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 组织管理 -->
+      <view class="section">
+        <view class="section-title">组织管理</view>
+        <view class="setting-group">
+          <view class="setting-item clickable" @tap="navigateToOrganizations">
+            <text class="setting-label">我的组织</text>
+            <view class="setting-value">
+              <text class="icon-arrow">›</text>
             </view>
           </view>
         </view>
@@ -158,6 +171,20 @@ export default {
           console.error('导航失败:', err);
           uni.switchTab({
             url: url
+          });
+        }
+      });
+    },
+
+    // 跳转到组织列表页面
+    navigateToOrganizations() {
+      uni.navigateTo({
+        url: '/pages/organization/index',
+        fail: (err) => {
+          console.error('导航到组织页面失败:', err);
+          uni.showToast({
+            title: '页面跳转失败',
+            icon: 'none'
           });
         }
       });

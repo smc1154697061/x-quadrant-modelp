@@ -31,6 +31,7 @@
 import chatIcon from '@/static/images/chat.png'
 import knowledgeIcon from '@/static/images/knowledge.png'
 import extractionIcon from '@/static/images/extraction.png'
+import settingsIcon from '@/static/images/settings.png'
 import logoImage from '@/static/images/logo.png'
 
 export default {
@@ -57,6 +58,12 @@ export default {
           text: '工具',
           iconPath: extractionIcon,
           selectedIconPath: extractionIcon
+        },
+        {
+          pagePath: '/pages/settings/index',
+          text: '设置',
+          iconPath: settingsIcon,
+          selectedIconPath: settingsIcon
         }
       ],
       logoSrc: logoImage
@@ -130,7 +137,12 @@ export default {
       if (pagePath === '/pages/tools/index') {
         return this.currentPath.startsWith('/pages/tools/');
       }
-      
+
+      // 处理设置页面
+      if (pagePath === '/pages/settings/index') {
+        return this.currentPath.startsWith('/pages/settings/');
+      }
+
       // 普通路径匹配
       return this.currentPath === pagePath;
     }
