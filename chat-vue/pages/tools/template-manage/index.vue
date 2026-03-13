@@ -1,5 +1,16 @@
 <template>
   <app-layout title="模板管理">
+    <!-- 自定义导航栏 -->
+    <view class="custom-navbar">
+      <view class="navbar-left" @tap="goBack">
+        <text class="back-icon">‹</text>
+      </view>
+      <view class="navbar-title">
+        <text>模板管理</text>
+      </view>
+      <view class="navbar-right"></view>
+    </view>
+
     <view class="template-manage-container">
       <!-- 搜索和筛选区域 -->
       <view class="filter-section">
@@ -157,6 +168,7 @@
 <script>
 import AppLayout from '../../../components/layout/AppLayout.vue';
 import api from '../../../utils/api.js';
+import router from '../../../utils/router.js';
 
 export default {
   components: {
@@ -188,6 +200,10 @@ export default {
     this.loadTemplates();
   },
   methods: {
+    goBack() {
+      router.navigateBack(1, { useSmartFallback: true });
+    },
+
     // 加载模板列表
     async loadTemplates() {
       if (this.loading) return;
@@ -401,6 +417,44 @@ export default {
 </script>
 
 <style scoped>
+/* 自定义导航栏 */
+.custom-navbar {
+  height: 44px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 15px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.navbar-left,
+.navbar-right {
+  width: 60px;
+}
+
+.navbar-left {
+  display: flex;
+  align-items: center;
+}
+
+.back-icon {
+  font-size: 32px;
+  color: #333;
+  font-weight: 300;
+}
+
+.navbar-title {
+  flex: 1;
+  text-align: center;
+  font-size: 17px;
+  font-weight: 600;
+  color: #333;
+}
+
 .template-manage-container {
   min-height: 100vh;
   background-color: #f5f7fa;

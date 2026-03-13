@@ -61,13 +61,14 @@
 import WatermarkEditor from './WatermarkEditor.vue';
 import WatermarkPreview from './WatermarkPreview.vue';
 import { platformUtils } from '../../../utils/platform-adapter.js';
+import router from '../../../utils/router.js';
 
 export default {
   components: {
     WatermarkEditor,
     WatermarkPreview
   },
-  
+
   data() {
     return {
       originalFile: null,
@@ -95,10 +96,10 @@ export default {
       }
     };
   },
-  
+
   methods: {
     goBack() {
-      uni.navigateBack();
+      router.navigateBack(1, { useSmartFallback: true });
     },
     
     selectFile() {
